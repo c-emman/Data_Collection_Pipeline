@@ -24,3 +24,20 @@ CHOOSE_SUBCATEGORIES_XPATH = '//section[@class="filter-group pr-filter-group-cat
 HEADING_INFO_ACTIVE_XPATH = '//h4[@class="p-more-info__heading p-more-info__heading--active"]'
 SIZE_AND_FIT_INACTIVE_XPATH = '//h4[@class="p-more-info__heading "][text()="Size & Fit"]'
 BRAND_BIO_INACTIVE_XPATH = '//h4[@class="p-more-info__heading "][text()="Brand Bio"]'
+price_sale_xpath = '//p[@class="product-price__old  "]'
+
+class AnyEc:
+    """ Use with WebDriverWait to combine expected_conditions
+        in an OR.
+    """
+    def __init__(self, *args):
+        self.ecs = args
+    def __call__(self, driver):
+        for fn in self.ecs:
+            try:
+                res = fn(driver)
+                if res:
+                    return res
+                    # Or return res if you need the element found
+            except:
+                pass

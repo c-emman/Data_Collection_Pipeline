@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
+from web_scraper_config import AnyEc
 import concurrent.futures as cf
 import multiprocessing
 import itertools
@@ -133,11 +134,13 @@ class Scraper():
 
     def scrape_subcategories(self, full_scrape_list):
         for dict in full_scrape_list:
-            self.driver.get(dict["subcategory_link"])
+            subcategory_link = dict["subcategory_link"]
+            category = dict["category"]
+            subcategory = dict["subcategory"]
+            self.driver.get(subcategory_link)
             link_list = self.get_links()
-            product_dict_list = self.scrape_item_data(link_list, dict["category"], dict["subcategory"])
-            self.download_images(product_dict_list, dict["category"], dict["subcategory"])
-            print(f'All the {dict["subcategory"]} pages in {dict["category"]} have been scraped')
+            self.scrape_item_data(link_list, category, subcategory)
+            print(f'All the {subcategory} pages in {category} have been scraped')
             time.sleep(2)
 
     def get_links(self):
@@ -158,7 +161,8 @@ class Scraper():
 
         for link in link_list:
             product_dict = dict()
-            self.driver.get(link) 
+            self.driver.get(link)
+            delay = 20
             product_dict["product_no"] = self.driver.find_elements(By.XPATH, web_scraper_config.product_no_xpath)[0].text
             PATH = web_scraper_config.RAW_DATA_PATH + f'/{category}/{sub_category}'
 
@@ -177,7 +181,9 @@ class Scraper():
             product_dict["uuid"] = str(uuid.uuid4())
             product_dict["brand"] = self.driver.find_element(By.XPATH, web_scraper_config.brand_xpath).text
             product_dict["product_info"] = self.driver.find_element(By.XPATH, web_scraper_config.product_info_xpath).text
-            product_dict["price"] = self.driver.find_element(By.XPATH, web_scraper_config.price_xpath).text
+            product_dict["price"] = WebDriverWait(self.driver, delay).until(AnyEc(EC.presence_of_element_located((By.XPATH,web_scraper_config.price_xpath)), EC.presence_of_element_located((By.XPATH, web_scraper_config.price_sale_xpath)))).text
+
+            # find_element(By.XPATH, web_scraper_config.price_xpath).text
             self.scroll()
             time.sleep(1)
             if self.driver.find_element(By.XPATH, web_scraper_config.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
@@ -219,7 +225,7 @@ class Scraper():
                 self.download_images(image_dict["link"], img_name)
                 a+=1
                 
-            product_dict["image_link"] = images_list
+            # product_dict["image_link"] = images_list
             product_dict_list.append(product_dict)
 
             with open(f'{item_path}/data.json', 'w') as fp:
