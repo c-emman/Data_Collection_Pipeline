@@ -133,17 +133,17 @@ class Scraper():
         print(full_scrape_list)
         return full_scrape_list
 
-    def scrape_subcategories(self, dict):
-        # for dict in full_scrape_list:
-        new_scrape = Scraper(web_scraper_config.WEBSITE)
-        new_scrape.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.COMMAND + 't')
-        new_scrape.driver.get(dict["subcategory_link"])
-        link_list = new_scrape.get_links()
-        product_dict_list = new_scrape.scrape_item_data(link_list, dict["category"], dict["subcategory"])
-        new_scrape.download_images(product_dict_list, dict["category"], dict["subcategory"])
-        print(f'All the {dict["subcategory"]} pages in {dict["category"]} have been scraped')
-        new_scrape.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.COMMAND + 'w')
-        time.sleep(2)
+    def scrape_subcategories(self, full_scrape_list):
+        for dict in full_scrape_list:
+            new_scrape = Scraper(web_scraper_config.WEBSITE)
+            new_scrape.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.COMMAND + 't')
+            new_scrape.driver.get(dict["subcategory_link"])
+            link_list = new_scrape.get_links()
+            product_dict_list = new_scrape.scrape_item_data(link_list, dict["category"], dict["subcategory"])
+            new_scrape.download_images(product_dict_list, dict["category"], dict["subcategory"])
+            print(f'All the {dict["subcategory"]} pages in {dict["category"]} have been scraped')
+            new_scrape.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.COMMAND + 'w')
+            time.sleep(2)
 
     def get_links(self):
         item_container = self.driver.find_element(By.XPATH, web_scraper_config.item_container_xpath)
