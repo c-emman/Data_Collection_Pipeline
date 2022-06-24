@@ -127,22 +127,17 @@ class Scraper():
         self.load_and_reject_promotion()
         department = self.ask_department()
         category_dict_list = self.get_categories(department)
-        full_scrape_list = self.get_subcategories(category_dict_list)
-        # with multiprocessing.Pool() as pool:
-        #     pool.map(self.scrape_subcategories, full_scrape_list)
-        print(full_scrape_list)
-        return full_scrape_list
+        full_scrape_list = self.get_subcategories(category_dict_list) 
+        self.scrape_subcategories(full_scrape_list)
+        print("Website has been scraped")
 
     def scrape_subcategories(self, full_scrape_list):
         for dict in full_scrape_list:
-            new_scrape = Scraper(web_scraper_config.WEBSITE)
-            new_scrape.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.COMMAND + 't')
-            new_scrape.driver.get(dict["subcategory_link"])
-            link_list = new_scrape.get_links()
-            product_dict_list = new_scrape.scrape_item_data(link_list, dict["category"], dict["subcategory"])
-            new_scrape.download_images(product_dict_list, dict["category"], dict["subcategory"])
+            self.driver.get(dict["subcategory_link"])
+            link_list = self.get_links()
+            product_dict_list = self.scrape_item_data(link_list, dict["category"], dict["subcategory"])
+            self.download_images(product_dict_list, dict["category"], dict["subcategory"])
             print(f'All the {dict["subcategory"]} pages in {dict["category"]} have been scraped')
-            new_scrape.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.COMMAND + 'w')
             time.sleep(2)
 
     def get_links(self):
@@ -205,7 +200,26 @@ class Scraper():
                 except:
                     pass
 
-            product_dict["image_link"] = self.driver.find_element(By.XPATH, web_scraper_config.image_link_xpath).get_attribute('src')
+            images_list = []
+            images_xpath = self.driver.find_elements(By.XPATH, '//ul[@class="p-images__preview-swatches"]//img')
+
+            a = 1
+            path_img = item_path + '/images'
+
+            if os.path.exists(path_img) == False:
+                os.makedirs(path_img)
+                print('image directory has been made')
+
+            for image in images_xpath:
+                image_dict = dict()
+                image_dict["image_no"] = str(f'{product_dict["product_no"]}_{a}')
+                image_dict["link"] = image.get_attribute('src')
+                img_name = path_img + str(f'/{product_dict["product_no"]}_{a}')
+                images_list.append(image_dict)
+                self.download_images(image_dict["link"], img_name)
+                a+=1
+                
+            product_dict["image_link"] = images_list
             product_dict_list.append(product_dict)
 
             with open(f'{item_path}/data.json', 'w') as fp:
@@ -213,23 +227,10 @@ class Scraper():
 
         return product_dict_list
 
-    def download_images(self, product_dict_list, category, sub_category):
-        path_img = web_scraper_config.RAW_DATA_PATH + f'/{category}/{sub_category}' + '/images'
-
-        if os.path.exists(path_img) == False:
-            os.makedirs(path_img)
-            print('image directory has been made')
-
-        a=0
-
-        for item in product_dict_list:
-            path  = path_img + f'/{item["product_no"]}_{a}.jpg'
-            urllib.request.urlretrieve(item["image_link"], path)
-            a+=1
-        print('all images have been saved locally')
+    def download_images(self, image_link, img_name):
+        path  = img_name + '.jpg'
+        urllib.request.urlretrieve(image_link, path)
 
 if __name__ == "__main__":
     web_scrape = Scraper(web_scraper_config.WEBSITE)
-    full_scrape_list = web_scrape.run_scrape()
-    with multiprocessing.Pool() as pool:
-        pool.map(web_scrape.scrape_subcategories, full_scrape_list)
+    web_scrape.run_scrape()
