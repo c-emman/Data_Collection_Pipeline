@@ -16,6 +16,8 @@ import json
 import urllib.request
 import web_scraper_config
 
+delay = 5
+
 class Scraper():
     def __init__(self, website) -> None:
         options = webdriver.ChromeOptions()
@@ -35,7 +37,8 @@ class Scraper():
     def search(self, search_input):
         search_bar = self.driver.find_element(By.XPATH, web_scraper_config.search_xpath)
         search_bar.click()
-        time.sleep(1)
+        # time.sleep(1)
+        WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.search_input_xpath)))
         enter_keys = self.driver.find_element(By.XPATH, web_scraper_config.search_input_xpath)
         enter_keys.send_keys(search_input)
         enter_keys.send_keys(Keys.RETURN)
@@ -48,26 +51,25 @@ class Scraper():
             accept_cookies_button = WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.accept_cookies_xpath)))
             print("Accept Cookies Button is Ready!")
             accept_cookies_button[0].click()
-            time.sleep(2)
+            # time.sleep(2)
             print("Accept cookies button has been clicked!")
         except TimeoutException:
             print("Loading took too much time!")
     
     def load_and_reject_promotion(self):
-        delay = 10
         try:
             WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.wait_for_promotion1_xpath)))
             reject_promotion_button = self.driver.find_element(By.XPATH, web_scraper_config.reject_promotion1_xpath)
             reject_promotion_button.click()
             print("Promotion has been closed!")
-            time.sleep(2)
+            # time.sleep(2)
         except:
             try:
                 WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.wait_for_promotion2_xpath)))
                 reject_promotion_button = self.driver.find_element(By.XPATH, web_scraper_config.reject_promotion2_xpath)
                 reject_promotion_button.click()
                 print("Promotion has been closed!")
-                time.sleep(2)
+                # time.sleep(2)
             except TimeoutException:
                 print("No promotion pop-up this time!")   
     
@@ -141,7 +143,7 @@ class Scraper():
             link_list = self.get_links()
             self.scrape_item_data(link_list, category, subcategory)
             print(f'All the {subcategory} pages in {category} have been scraped')
-            time.sleep(2)
+            # time.sleep(2)
 
     def get_links(self):
         item_container = self.driver.find_element(By.XPATH, web_scraper_config.item_container_xpath)
@@ -162,7 +164,6 @@ class Scraper():
         for link in link_list:
             product_dict = dict()
             self.driver.get(link)
-            delay = 20
             product_dict["product_no"] = self.driver.find_elements(By.XPATH, web_scraper_config.product_no_xpath)[0].text
             PATH = web_scraper_config.RAW_DATA_PATH + f'/{category}/{sub_category}'
 
@@ -185,11 +186,12 @@ class Scraper():
 
             # find_element(By.XPATH, web_scraper_config.price_xpath).text
             self.scroll()
-            time.sleep(1)
+            # time.sleep(1)
             if self.driver.find_element(By.XPATH, web_scraper_config.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
                 product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, web_scraper_config.size_and_fit_xpath).text    
             else:
                 try:
+                    WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.SIZE_AND_FIT_INACTIVE_XPATH)))
                     size_and_fit_button = self.driver.find_element(By.XPATH, web_scraper_config.SIZE_AND_FIT_INACTIVE_XPATH)
                     size_and_fit_button.click()
                     product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, web_scraper_config.size_and_fit_xpath).text
@@ -199,8 +201,9 @@ class Scraper():
             if self.driver.find_element(By.XPATH, web_scraper_config.HEADING_INFO_ACTIVE_XPATH).text.lower() == "brand bio":
                 product_dict["brand_bio"] = self.driver.find_element(By.XPATH, web_scraper_config.brand_bio_xpath).text   
             else:
-                try:   
-                    brand_bio_button = self.driver.find_element(By.XPATH, web_scraper_config.BRAND_BIO_INACTIVE_XPATH)
+                try:
+                    WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.BRAND_BIO_INACTIVE_XPATH)))
+                    brand_bio_button =  self.driver.find_element(By.XPATH, web_scraper_config.BRAND_BIO_INACTIVE_XPATH)
                     brand_bio_button.click()
                     product_dict["brand_bio"] = self.driver.find_element(By.XPATH, web_scraper_config.brand_bio_xpath).text
                 except:
