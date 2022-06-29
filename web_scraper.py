@@ -27,15 +27,23 @@ class Scraper():
         
     '''
     global delay
-    delay = 5
+    delay = 20
     def __init__(self, website: str) -> None:
         '''
         See help(Scraper) for more information
         
         '''
         options = webdriver.ChromeOptions()
-        options.add_argument("--start-maximized")
-        # options.add_argument("--headless")
+        #options.add_argument('--ignore-certificate-errors')
+        #options.add_argument('--allow-running-insecure-content') 
+        #options.add_argument('--no-sandbox') 
+        options.add_argument('--headless') 
+        #options.add_argument('--disable-dev-shm-usage')
+        options.add_argument("user-agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'") 
+        options.add_argument("window-size=1920,1080") 
+        
+        # options.add_argument("--start-maximized")
+        #options.add_argument("--headless")
         self.driver = webdriver.Chrome(chrome_options=options)
         self.website = website
 
@@ -117,20 +125,33 @@ class Scraper():
             None
             
         '''
-        time.sleep(15)
-        try:
-            WebDriverWait(self.driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.wait_for_promotion4_xpath)))
-            reject_promotion_button = self.driver.find_element(By.XPATH, web_scraper_config.reject_promotion4_xpath)
-            reject_promotion_button.click()
-            print("Promotion has been closed!")
-        except:
+        time.sleep(5)
+        # page_body = self.driver.find_element(By.XPATH, '//body')
+        # page_body.click()
+        a=0
+        
+        while a < 10:
             try:
-                WebDriverWait(self.driver,30).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.wait_for_promotion3_xpath)))
-                reject_promotion_button = self.driver.find_element(By.XPATH, web_scraper_config.reject_promotion3_xpath)
-                reject_promotion_button.click()
-                print("Promotion has been closed!")
-            except TimeoutException:
-                print("No promotion pop-up this time!")   
+                WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, '//div[@id="mf__div"][@aria-hidden="true"]')))
+                try:
+                    WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.wait_for_promotion4_xpath)))
+                    reject_promotion_button = self.driver.find_element(By.XPATH, web_scraper_config.reject_promotion4_xpath)
+                    reject_promotion_button.click()
+                    print("Promotion has been closed!")
+                    break
+                except:
+                    try:
+                        WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.wait_for_promotion3_xpath)))
+                        reject_promotion_button = self.driver.find_element(By.XPATH, web_scraper_config.reject_promotion3_xpath)
+                        reject_promotion_button.click()
+                        print("Promotion has been closed!")
+                        break
+                    except TimeoutException:
+                        print("No promotion pop-up this time!")  
+                        
+            except:
+                a+=1
+                continue 
     
     def ask_department(self) -> str:
         '''
@@ -162,11 +183,23 @@ class Scraper():
         """
         WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.DEPARTMENT_XPATH.format(department))))
         department_button = self.driver.find_element(By.XPATH, web_scraper_config.DEPARTMENT_XPATH.format(department))
-        department_button.click()
+        self.driver.get(department_button.get_attribute('href'))
 
-        WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.DEPARTMENT_BUTTON_XPATH)))
-        shop_department_button = self.driver.find_element(By.XPATH, web_scraper_config.DEPARTMENT_BUTTON_XPATH)
-        shop_department_button.click()
+        # try:
+        #     WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.DEPARTMENT_BUTTON_XPATH)))
+        #     shop_department_button = self.driver.find_element(By.XPATH, web_scraper_config.DEPARTMENT_BUTTON_XPATH)
+        #     shop_department_button.click()
+        # except: 
+        #     pass
+        time.sleep(5)
+
+        if len(self.driver.find_elements(By.XPATH, '//section[@class="filter-group pr-filter-group-categories"]//h3[@class="filter-group__title filter-group__title--closed"]')) >0:
+            WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, '//section[@class="filter-group pr-filter-group-categories"]//h3')))
+            category_dropdown = self.driver.find_element(By.XPATH, '//section[@class="filter-group pr-filter-group-categories"]//h3')
+            category_dropdown.click()
+            print('Category dropdown menu clicked')
+        else:
+            pass
 
         choose_categories = self.driver.find_elements(By.XPATH, web_scraper_config.CHOOSE_CATEGORIES_XPATH)
         category_dict_list = []
@@ -269,7 +302,7 @@ class Scraper():
             pagination_no = 0
 
         a =0
-        while True:
+        if a == pagination_no:
             WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.item_container_xpath)))
             item_container = self.driver.find_element(By.XPATH, web_scraper_config.item_container_xpath)
             item_list = item_container.find_elements(By.XPATH, './div')
@@ -278,15 +311,27 @@ class Scraper():
                 a_tag = item.find_element(By.TAG_NAME, 'a')
                 _link = a_tag.get_attribute('href')
                 link_list.append(_link)
-            
-            a+= 1
-            
-            if a == (pagination_no):
-                print("Links on this page have been scraped")
-                return link_list
+            return link_list
+        else:
+            while True:
 
-            paginagion_link = str(pagination[:index]) + f'{a+1}/'    
-            self.driver.get(paginagion_link)
+                WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.item_container_xpath)))
+                item_container = self.driver.find_element(By.XPATH, web_scraper_config.item_container_xpath)
+                item_list = item_container.find_elements(By.XPATH, './div')
+
+                for item in item_list:
+                    a_tag = item.find_element(By.TAG_NAME, 'a')
+                    _link = a_tag.get_attribute('href')
+                    link_list.append(_link)
+                
+                a+= 1
+                
+                if a == (pagination_no):
+                    print("Links on this page have been scraped")
+                    return link_list
+
+                paginagion_link = str(pagination[:index]) + f'{a+1}/'    
+                self.driver.get(paginagion_link)
             
 
 
@@ -303,7 +348,7 @@ class Scraper():
             list: _description_
         """
 
-        for link in link_list[:5]:
+        for link in link_list[:1]:
             product_dict = dict()
             self.driver.get(link)
             WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.product_no_xpath)))
