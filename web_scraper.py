@@ -18,32 +18,36 @@ import urllib.request
 import web_scraper_config
 
 class Scraper():
-    '''
+    """
     This class is used to scrape item data from clothing stores.
     
     Attributes:
         website (str): The website homepage which is to be scraped
-        driver (webdriver): The webdriver function which will allow the program to access the webpage
-        
-    '''
+        driver (webdriver): The webdriver function which will allow the program to access the webpage_
+    
+    """
+
     global delay
     delay = 20
+
     def __init__(self, website: str) -> None:
-        '''
+        """
         See help(Scraper) for more information
+
         
-        '''
-        options = webdriver.ChromeOptions()
+        """
+        
         #options.add_argument('--ignore-certificate-errors')
         #options.add_argument('--allow-running-insecure-content') 
         #options.add_argument('--no-sandbox') 
-        options.add_argument('--headless') 
+        # options.add_argument("--start-maximized")
         #options.add_argument('--disable-dev-shm-usage')
+
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
         options.add_argument("user-agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'") 
         options.add_argument("window-size=1920,1080") 
         
-        # options.add_argument("--start-maximized")
-        #options.add_argument("--headless")
         self.driver = webdriver.Chrome(chrome_options=options)
         self.website = website
 
@@ -57,13 +61,13 @@ class Scraper():
         self.driver.execute_script("window.scrollTo(0, 500);")
     
     def browse_next(self) -> webdriver:
-        '''
+        """
         This function allows the user to move from page to page by clicking on the next page button
-        
-        Returns:
-            webdriver: The current webpage so the information is not lost
 
-        '''
+        Returns:
+           self.driver (webdriver): _description_The current webpage so the information is not lost
+        """
+
         self.driver.execute_script("window.scrollTo(0 , document.body.scrollHeight);")
         WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.next_page_xpath)))
         next_page = self.driver.find_element(By.XPATH, web_scraper_config.next_page_xpath) 
@@ -71,13 +75,13 @@ class Scraper():
         return self.driver
 
     def search(self) -> None:
-        '''
+        """
         This function allows the user to search the webpage with a desired search term.
-        
+
         Returns:
             None
-        
-        '''
+        """
+
         search_bar = self.driver.find_element(By.XPATH, web_scraper_config.search_xpath)
         search_bar.click()
         WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, web_scraper_config.search_input_xpath)))
@@ -96,17 +100,15 @@ class Scraper():
         print(f'Search for {search_input} has been entered')
     
     def load_and_accept_cookies(self, website: str) -> None:
-        '''
+        """
         This function will wait for the page to load and accept page cookies
-        
+
         Args:
-            website (str) = The homepage of the desired website to be scraped.
-            
+            website (str): The homepage of the desired website to be scraped.
+
         Returns:
             None
-        
-         '''
-
+        """
         self.driver.get(website)
         delay = 20
         try:
@@ -118,18 +120,14 @@ class Scraper():
             print("Loading took too much time!")
     
     def load_and_reject_promotion(self) -> None:
-        '''
+        """
         This function will load promotional pop-ups and close them
-        
+
         Returns:
             None
-            
-        '''
+        """
         time.sleep(5)
-        # page_body = self.driver.find_element(By.XPATH, '//body')
-        # page_body.click()
         a=0
-        
         while a < 10:
             try:
                 WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, '//div[@id="mf__div"][@aria-hidden="true"]')))
@@ -154,13 +152,14 @@ class Scraper():
                 continue 
     
     def ask_department(self) -> str:
-        '''
+        """
         This fucntion will ask the department which is desired to be scraped, i.e Men or Women
-        
+
         Returns:
             department (str): The department which is to be scraped
-            
-        '''
+    
+        """
+
         while True:
             department = str(input("Enter either the Men or Women's department to scrape: ")).lower().capitalize()
             if department == 'Men' or department == 'Women':
@@ -278,12 +277,13 @@ class Scraper():
 
         for dict in full_scrape_list:
             subcategory_link = dict["subcategory_link"]
+            department = dict["department"]
             category = dict["category"]
             subcategory = dict["subcategory"]
             self.driver.get(subcategory_link)
             index = int(len(web_scraper_config.WEBSITE)) + int(len(dict["department"])) + int(len(category)) + int(len(subcategory)) + 10
             link_list = self.get_links(index)
-            self.scrape_item_data(link_list, category, subcategory)
+            self.scrape_item_data(link_list, department, category, subcategory)
             print(f'All the {subcategory} pages in {category} have been scraped')
 
     def get_links(self, index :int) -> list:
@@ -335,17 +335,18 @@ class Scraper():
             
 
 
-    def scrape_item_data(self, link_list: list, category: str, sub_category: str) -> list:
+    def scrape_item_data(self, link_list: list, department: str, category: str, sub_category: str) -> None:
         """
         This function scrapes the data for an individual item into a dict and saves that dict as a json file
 
         Args:
             link_list (list): A list of links to all the items within a subcategory
+            department (str): The department which is being scraped
             category (str): The category the item is located in
             sub_category (str): The sub-category the item is located in
 
         Returns:
-            list: _description_
+            None
         """
 
         for link in link_list[:1]:
@@ -353,7 +354,7 @@ class Scraper():
             self.driver.get(link)
             WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, web_scraper_config.product_no_xpath)))
             product_dict["product_no"] = self.driver.find_elements(By.XPATH, web_scraper_config.product_no_xpath)[0].text
-            PATH = web_scraper_config.RAW_DATA_PATH + f'/{category}/{sub_category}'
+            PATH = web_scraper_config.RAW_DATA_PATH + f'/{department}/{category}/{sub_category}'
 
             if os.path.exists(PATH) == False:
                 os.makedirs(PATH)
