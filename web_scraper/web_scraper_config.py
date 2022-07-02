@@ -1,3 +1,4 @@
+
 class Configuration_XPATH:
     """
     A configuration class which stores all the relevant XPATH data for the desired website.
@@ -7,6 +8,7 @@ class Configuration_XPATH:
         pass
 
     WEBSITE = "https://www.harveynichols.com/"
+    DEP_LIST = ['Men', 'Women', 'Kids']
     next_page_xpath = '//*[@class="pagination__arrow pagination__arrow--right"]'
     search_xpath = '//span[@class="nav-search__trigger-icon"]'
     search_input_xpath = '//input[@id="search-input"]'
