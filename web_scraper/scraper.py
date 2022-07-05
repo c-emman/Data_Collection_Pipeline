@@ -6,19 +6,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
-from web_scraper_config import AnyEc, Configuration_XPATH, Driver_Configuration
-import item_scraper
-import concurrent.futures as cf
-import multiprocessing
-import itertools
+from web_scraper.config import Configuration_XPATH, Driver_Configuration
 import time
-import uuid
-import os
-import json
-import urllib.request
 
-
-class Scraper():
+class Scraper:
     """
     This class is used to scrape item data from clothing stores.
     
@@ -27,10 +18,6 @@ class Scraper():
         driver (webdriver): The webdriver function which will allow the program to access the webpage_
     
     """
-
-    global delay
-    delay = 20
-
     def __init__(self, website: str) -> None:
         """
         See help(Scraper) for more information
@@ -41,10 +28,10 @@ class Scraper():
         options.add_argument(Driver_Configuration.HEADLESS)
         options.add_argument(Driver_Configuration.USER_AGENT) 
         options.add_argument(Driver_Configuration.WINDOW_SIZE) 
-        
         self.driver = webdriver.Chrome(chrome_options=options)
         self.website = website
-
+        self.delay = 20
+        
     def scroll(self) -> None:
         '''
         This function allows the user to scroll a webpage.
@@ -63,7 +50,7 @@ class Scraper():
         """
 
         self.driver.execute_script("window.scrollTo(0 , document.body.scrollHeight);")
-        WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.next_page_xpath)))
+        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.next_page_xpath)))
         next_page = self.driver.find_element(By.XPATH, Configuration_XPATH.next_page_xpath) 
         next_page.click()
         return self.driver
@@ -78,7 +65,7 @@ class Scraper():
 
         search_bar = self.driver.find_element(By.XPATH, Configuration_XPATH.search_xpath)
         search_bar.click()
-        WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.search_input_xpath)))
+        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.search_input_xpath)))
         enter_keys = self.driver.find_element(By.XPATH, Configuration_XPATH.search_input_xpath)
 
         while True:
@@ -104,9 +91,9 @@ class Scraper():
             None
         """
         self.driver.get(website)
-        delay = 20
+        self.delay = 20
         try:
-            accept_cookies_button = WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.accept_cookies_xpath)))
+            accept_cookies_button = WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.accept_cookies_xpath)))
             print("Accept Cookies Button is Ready!")
             accept_cookies_button[0].click()
             print("Accept cookies button has been clicked!")
@@ -162,7 +149,7 @@ class Scraper():
             else:
                 print("Please enter either the Men or Women department")
 
-    def get_categories(self, department: str) -> list:
+    def get_categories(self, department:str) -> list:
         """
         This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
 
@@ -174,14 +161,14 @@ class Scraper():
             per department and the links to the category
 
         """
-        WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))))
+        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))))
         department_button = self.driver.find_element(By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))
         self.driver.get(department_button.get_attribute('href'))
         time.sleep(5)
 
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH))>0:
             try:
-                WebDriverWait(self.driver, delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
+                WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
                 shop_department_button = self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)
                 shop_department_button[3].click()
                 time.sleep(5)
@@ -190,7 +177,7 @@ class Scraper():
         
 
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.choose_categories_dropdown_xpath)) >0:
-            WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.choose_category_button)))
+            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.choose_category_button)))
             category_dropdown = self.driver.find_element(By.XPATH, Configuration_XPATH.choose_category_button)
             category_dropdown.click()
             print('Category dropdown menu clicked')
@@ -232,7 +219,7 @@ class Scraper():
             category_dict = category_dict_list[a]
             self.driver.get(category_dict["link"])
             time.sleep(2)
-            WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.CHOOSE_CATEGORIES_XPATH)))
+            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.CHOOSE_CATEGORIES_XPATH)))
             choose_subcategories = self.driver.find_elements(By.XPATH, Configuration_XPATH.CHOOSE_SUBCATEGORIES_XPATH)
             
             for element in choose_subcategories:
@@ -247,47 +234,12 @@ class Scraper():
             a+=1
         return full_scrape_list 
 
-    def run_scrape(self) -> None:
-        """
-        This function ties all the relevant functions needed to scrape the website together
-
-        Returns:
-            None
-
-        """
-        self.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
-        self.load_and_reject_promotion()
-        for department in Configuration_XPATH.DEP_LIST:
-            category_dict_list = self.get_categories(department)
-            full_scrape_list = self.get_subcategories_links(category_dict_list) 
-            self.get_subcategories(full_scrape_list)
-            print(f"{department} department has been scraped")
-
-    def get_subcategories(self, full_scrape_list: list) -> None:
-        """
-        This function takes the full_scrape_list list of dicts, iterates through the list, visits each dict sub-category data individually
-        and scrapes the item data. This function achieves this by calling other functions; first get_links() and then scrape_item_data()
-
-        Args:
-            full_scrape_list (list): A list of dicts containing each sub-category name, link and the corresponding category and department data
-        """
-
-        for dict in full_scrape_list:
-            subcategory_link = dict["subcategory_link"]
-            department = dict["department"]
-            category = dict["category"]
-            subcategory = dict["subcategory"]
-            self.driver.get(subcategory_link)
-            index = int(len(Configuration_XPATH.WEBSITE)) + int(len(dict["department"])) + int(len(category)) + int(len(subcategory)) + 10
-            link_list = self.get_links(index)
-            print(f"{subcategory} links in the {department}'s department have been retrieved")
-            item_scrape = item_scraper.Item_Scraper(link_list, department, category, subcategory)
-            item_scrape.run_item_scrape()
-            # print(f'All the {subcategory} pages in {category} have been scraped')
-
     def get_links(self, index :int) -> list:
         """
         This function visits a sub-category and gets a list of all the links to all the items in the subcategory
+
+        Args:
+            index (int): An index used to slice the URL and obtain the number of pages to scrape in the subcategory
 
         Returns:
            link_list (list): A list of links to all the items within a subcategory
@@ -302,7 +254,7 @@ class Scraper():
 
         a =0
         if a == pagination_no:
-            WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
+            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
             item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
             item_list = item_container.find_elements(By.XPATH, './div')
 
@@ -314,7 +266,7 @@ class Scraper():
         else:
             while True:
 
-                WebDriverWait(self.driver, delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
+                WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
                 item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
                 item_list = item_container.find_elements(By.XPATH, './div')
 
@@ -332,7 +284,3 @@ class Scraper():
                 paginagion_link = str(pagination[:index]) + f'{a+1}/'    
                 self.driver.get(paginagion_link)
             
-
-if __name__ == "__main__":
-    web_scrape = Scraper(Configuration_XPATH.WEBSITE)
-    web_scrape.run_scrape()
