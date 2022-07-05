@@ -1,4 +1,3 @@
-
 class Configuration_XPATH:
     """
     A configuration class which stores all the relevant XPATH data for the desired website.
