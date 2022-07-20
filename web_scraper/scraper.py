@@ -28,7 +28,7 @@ class Scraper:
         options.add_argument(Driver_Configuration.HEADLESS)
         options.add_argument(Driver_Configuration.USER_AGENT) 
         options.add_argument(Driver_Configuration.WINDOW_SIZE) 
-        self.driver = webdriver.Chrome(chrome_options=options)
+        self.driver = webdriver.Chrome(options=options)
         self.website = website
         self.delay = 20
         
@@ -107,9 +107,12 @@ class Scraper:
         Returns:
             None
         """
-        time.sleep(5)
+        time.sleep(2)
         a=0
-        while a < 10:
+        while True:
+            if a == 10:
+                print("No promotion pop-up this time!")
+                break
             try:
                 WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.promotion_box)))
                 try:
@@ -126,8 +129,7 @@ class Scraper:
                         print("Promotion has been closed!")
                         break
                     except TimeoutException:
-                        print("No promotion pop-up this time!")  
-                        
+                        print("No promotion pop-up this time!")            
             except:
                 a+=1
                 continue 
@@ -228,7 +230,7 @@ class Scraper:
                 full_scrape_dict["category"] = category_dict["category"]
                 full_scrape_dict["category_link"] = category_dict["link"]
                 index = int(len(Configuration_XPATH.WEBSITE))+ int(len(category_dict["department"])) +int(len(category_dict["category"])) + 3
-                full_scrape_dict["subcategory"] = element.get_attribute('href')[index:-1]
+                full_scrape_dict["subcategory"] = element.get_attribute('href')[index:-1].replace("-", "_")
                 full_scrape_dict["subcategory_link"] = element.get_attribute('href')
                 full_scrape_list.append(full_scrape_dict)
             a+=1
@@ -283,4 +285,3 @@ class Scraper:
 
                 paginagion_link = str(pagination[:index]) + f'{a+1}/'    
                 self.driver.get(paginagion_link)
-            
