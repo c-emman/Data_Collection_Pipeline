@@ -16,13 +16,12 @@ class Item_ScraperTestCase(unittest.TestCase):
     last_image_link = "https://m.hng.io/catalog/product/8/9/895580_burgundy_5.jpg?io=PDP_THUMB"
 
     def setUp(self) -> None:
-        self.item_scraper = Item_Scraper()
-        self.scraper = scraper.Scraper(Configuration_XPATH.WEBSITE)
+        self.item_scraper = Item_Scraper(Configuration_XPATH.WEBSITE)
         return super().setUp()
     
     def test_scrape_item_data(self):
-        self.scraper.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
-        self.scraper.load_and_reject_promotion()
+        self.item_scraper.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
+        self.item_scraper.load_and_reject_promotion()
         self.item_scraper.driver.get(test_case_link)
         product_dict = self.item_scraper.scrape_item_data()
 
@@ -33,8 +32,8 @@ class Item_ScraperTestCase(unittest.TestCase):
 
 
     def test_get_images(self):
-        self.scraper.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
-        self.scraper.load_and_reject_promotion()
+        self.item_scraper.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
+        self.item_scraper.load_and_reject_promotion()
         self.item_scraper.driver.get(test_case_link)
         product_dict = dict()
         product_dict["product_no"] = product_no
@@ -67,8 +66,8 @@ class Item_ScraperTestCase(unittest.TestCase):
         self.assertTrue(result == True, '.jpg image was saved.')
 
     def tearDown(self) -> None:
-        self.item_scraper.close()
+        del self.item_scraper
         return super().tearDown()
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
