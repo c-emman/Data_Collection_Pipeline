@@ -60,6 +60,18 @@ class Driver_Configuration:
     USER_AGENT = "user-agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'"
     WINDOW_SIZE = "window-size=1920,1080"
 
+class Db_Config:
+
+    def __init__(self) -> None:
+        pass
+
+    DATABASE_TYPE = 'postgresql'
+    DBAPI = 'psycopg2'
+    ENDPOINT = 'webscrape.ctlcajniy2jq.us-west-1.rds.amazonaws.com'
+    USER = 'postgres'
+    PASSWORD = 'password123'
+    PORT = 5432
+    DATABASE = 'postgres'
 
 
 class AnyEc:
