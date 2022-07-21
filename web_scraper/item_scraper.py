@@ -23,7 +23,7 @@ class Item_Scraper(Scraper):
         self.department = str()
         self.category = str()
         self.subcategory = str()
-        self.list_max = 3
+        self.list_max = 2
         self.s3_client = boto3.client('s3')
         self.bucketname = 'chris-aircore-s3bucket'
         self.parser = argparse.ArgumentParser(description='Item Scraper class which will scrape products from website.')
@@ -39,13 +39,13 @@ class Item_Scraper(Scraper):
         self.products_scraped_cloud = list()
         self.dep_list = Configuration_XPATH.DEP_LIST
         if self.args.men is True:
-            self.dep_list = Configuration_XPATH.DEP_LIST[0]
+            self.dep_list = list(Configuration_XPATH.DEP_LIST[0])
             print('Will scrape only the Mens department.')
         elif self.args.women is True:
-            self.dep_list = Configuration_XPATH.DEP_LIST[1]
+            self.dep_list = list(Configuration_XPATH.DEP_LIST[1])
             print('Will scrape only the Womens department.')
         elif self.args.kids is True:
-            self.dep_list = Configuration_XPATH.DEP_LIST[2]
+            self.dep_list = list(Configuration_XPATH.DEP_LIST[2])
             print('Will scrape only the Kids department.')
         else:
             print('Will scrape Mens, Womens and Kids departments.')
@@ -67,20 +67,11 @@ class Item_Scraper(Scraper):
         self.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
         self.load_and_reject_promotion()    
         
-        if type(self.dep_list) == list:
-            for department in self.dep_list:
-                self.department = department
-                if self.args.locally is False:
-                    self.engine.execute(f'''CREATE SCHEMA IF NOT EXISTS {self.department}_data''')
-                    print(f'The {self.department}_data schema has been made')
-                category_dict_list = self.get_categories(self.department)
-                full_scrape_list = self.get_subcategories_links(category_dict_list) 
-                self.run_subcategory_scrape(full_scrape_list)
-                print(f"{self.department} department has been scraped")
-        else:
-            self.department = self.dep_list
+        for department in self.dep_list:
+            self.department = department
             if self.args.locally is False:
                 self.engine.execute(f'''CREATE SCHEMA IF NOT EXISTS {self.department}_data''')
+                print(f'The {self.department}_data schema has been made')
             category_dict_list = self.get_categories(self.department)
             full_scrape_list = self.get_subcategories_links(category_dict_list) 
             self.run_subcategory_scrape(full_scrape_list)
@@ -115,6 +106,7 @@ class Item_Scraper(Scraper):
                                             brand_bio VARCHAR(2000),
                                             image_links VARCHAR(1000)
                                             );''')
+                print(f'The {self.subcategory} table in the {self.department}_data schema has been made.')
                 result = self.engine.execute(f'''SELECT product_no FROM {self.department}_data.{self.subcategory}''')
                 for product_no in result:
                     self.products_scraped_cloud.append(str(product_no).replace("(", "").replace(")", "").replace(",", "").replace("'", ""))
@@ -142,7 +134,7 @@ class Item_Scraper(Scraper):
             images_tuple = self.get_images(path_img, product_dict)
             images_list = images_tuple[0]
             product_dict["image_links"] = images_list
-            print(f'items scraped {self.products_scraped_cloud} and is of type: {type(self.products_scraped_cloud)} each element is of type: {type(self.products_scraped_cloud[0])}, {self.products_scraped_cloud[0]}')
+            # print(f'items scraped {self.products_scraped_cloud} and is of type: {type(self.products_scraped_cloud)} each element is of type: {type(self.products_scraped_cloud[0])}, {self.products_scraped_cloud[0]}')
             if self.args.locally is False:
                 if product_dict['product_no'] in self.products_scraped_cloud:
                     print(f'Product information for item {product_dict["product_no"]} has already been scraped')
@@ -228,9 +220,8 @@ class Item_Scraper(Scraper):
                     product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text
                 except:
                     pass
-
         return product_dict
-      
+        
     def get_images(self, path_img: str, product_dict: dict) -> list:
         """
         The function will get all the images for an item and call a function to download the image
