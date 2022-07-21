@@ -1,0 +1,5 @@
+# This is a file which has all the necessary dependancies needed
+#in order to properly run the web_scrpaer module
+boto3==1.24.24
+selenium==4.3.0
+SQLAlchemy==1.4.39
