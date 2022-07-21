@@ -5,6 +5,7 @@ from web_scraper.config import AnyEc, Configuration_XPATH, Db_Config
 from web_scraper.scraper import Scraper
 from sqlalchemy import select
 import pandas as pd
+import tempfile
 import argparse
 import sqlalchemy
 import boto3
@@ -133,32 +134,16 @@ class Item_Scraper(Scraper):
             self.create_dir(path_img)
             images_tuple = self.get_images(path_img, product_dict)
             images_list = images_tuple[0]
+            images_link_list = images_tuple[1]
             product_dict["image_links"] = images_list
-            # print(f'items scraped {self.products_scraped_cloud} and is of type: {type(self.products_scraped_cloud)} each element is of type: {type(self.products_scraped_cloud[0])}, {self.products_scraped_cloud[0]}')
             if self.args.locally is False:
                 if product_dict['product_no'] in self.products_scraped_cloud:
                     print(f'Product information for item {product_dict["product_no"]} has already been scraped')
                     pass
                 else:
-                    value_1 = f"'{product_dict['uuid']}'"
-                    value_2 = f"'{product_dict['product_no']}'"
-                    value_3 = f"'{product_dict['brand']}'"
-                    transform_4 = product_dict['product_info'].replace("'s", "s").replace("'", ".")
-                    value_4 = f"'{transform_4}'"
-                    value_5 = float(product_dict['price'][1:].replace(",", ""))
-                    if 'size_and_fit' in product_dict:
-                        transform_6 = product_dict['size_and_fit'].replace("'s", "s").replace("'", ".")
-                        value_6 = f"'{transform_6}'"
-                    else:
-                        value_6 = "''"
-                    if 'brand_bio' in product_dict:
-                        transform_7 = product_dict['brand_bio'].replace("'s", "s").replace("'", ".")
-                        value_7 = f"'{transform_7}'"
-                    else:
-                        value_7 = "''"
-                    transform_8 = str(images_tuple[1]).replace("'", "*")
-                    value_8 = f"'{transform_8}'"
-                    table_insert = f'({value_1}, {value_2}, {value_3}, {value_4}, {value_5}, {value_6}, {value_7}, {value_8})'
+                    table_insert = self.clean_product_data(product_dict, images_link_list)
+                    self.engine.execute(sqlalchemy.text(f'''INSERT INTO {self.department}_data.{self.subcategory}(uuid, product_no, brand, product_info, price, size_and_fit, brand_bio, image_links) VALUES{table_insert}'''))
+                    print(f'...Inserting the data into the PostgreSQL AWS RDS database in the {self.department}_data.{self.subcategory} table for product: {product_dict["product_no"]}...')   
                     if self.args.cloud is False:
                         self.create_json(product_dict, item_path)
                         print(f'...Saving .json file locally for product: {product_dict["product_no"]}...')
@@ -167,10 +152,9 @@ class Item_Scraper(Scraper):
                     if self.args.cloud is True:
                         self.s3_client.put_object(Body=json.dumps(product_dict), Bucket=self.bucketname, Key=f'{product_dict["product_no"]}.json')
                         print(f'...Uploading .json file for product {product_dict["product_no"]} directly to S3...')
-                    self.engine.execute(sqlalchemy.text(f'''INSERT INTO {self.department}_data.{self.subcategory}(uuid, product_no, brand, product_info, price, size_and_fit, brand_bio, image_links) VALUES{table_insert}'''))
-                    print(f'...Inserting the data into the PostgreSQL AWS RDS database in the {self.department}_data.{self.subcategory} table for product: {product_dict["product_no"]}...')   
-            self.create_json(product_dict, item_path)
-            print(f'...Saving .json file locally for product: {product_dict["product_no"]}...')    
+            else:
+                self.create_json(product_dict, item_path)
+                print(f'...Saving .json file locally for product: {product_dict["product_no"]}...')    
         print(f"All the {self.subcategory} data in the {self.department}'s department has been scraped.")
         
 
@@ -190,7 +174,8 @@ class Item_Scraper(Scraper):
         product_dict = dict()
         WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.product_no_xpath)))
         if self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text in self.products_scraped_cloud:
-            print('Product information has already been scraped')
+            product_no = self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text
+            print(f'Information for product: {product_no} has already been scraped')
             self.flag =  True
         else:
             product_dict["uuid"] = str(uuid.uuid4())
@@ -221,7 +206,29 @@ class Item_Scraper(Scraper):
                 except:
                     pass
         return product_dict
-        
+
+    def clean_product_data(self, product_dict: dict, images_link_list: list):
+        value_1 = f"'{product_dict['uuid']}'"
+        value_2 = f"'{product_dict['product_no']}'"
+        value_3 = f"'{product_dict['brand']}'"
+        transform_4 = product_dict['product_info'].replace("'s", "s").replace("'", ".")
+        value_4 = f"'{transform_4}'"
+        value_5 = float(product_dict['price'][1:].replace(",", ""))
+        if 'size_and_fit' in product_dict:
+            transform_6 = product_dict['size_and_fit'].replace("'s", "s").replace("'", ".")
+            value_6 = f"'{transform_6}'"
+        else:
+            value_6 = "''"
+        if 'brand_bio' in product_dict:
+            transform_7 = product_dict['brand_bio'].replace("'s", "s").replace("'", ".")
+            value_7 = f"'{transform_7}'"
+        else:
+            value_7 = "''"
+        transform_8 = str(images_link_list).replace("'", "*")
+        value_8 = f"'{transform_8}'"
+        table_insert = f'({value_1}, {value_2}, {value_3}, {value_4}, {value_5}, {value_6}, {value_7}, {value_8})'
+        return table_insert
+    
     def get_images(self, path_img: str, product_dict: dict) -> list:
         """
         The function will get all the images for an item and call a function to download the image
@@ -260,10 +267,11 @@ class Item_Scraper(Scraper):
                 else:
                     self.upload_data_s3(f'{img_name}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
                     b += 1
-                    # print(f'Product: {image_dict["image_no"]} image uploaded to S3')
             else:
-                #add uploading image directly to s3
-                pass
+                with tempfile.TemporaryDirectory() as tempdir:
+                    self.download_images(image_dict["link"], f'{tempdir}/{product_dict["product_no"]}_{str(a)}')
+                    self.upload_data_s3(f'{tempdir}/{product_dict["product_no"]}_{str(a)}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
+                b += 1
             a+=1
         if self.args.locally is False:
             print(f'{b} images for product: {product_dict["product_no"]} have been uploaded to S3')
