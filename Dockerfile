@@ -6,7 +6,7 @@ RUN sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable 
 
 RUN apt-get -y update
 
-RUN apt-get install -y google-chrome-stable
+RUN apt-get install -y google-chrome-beta
 
 RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
 
@@ -14,13 +14,11 @@ RUN apt-get install -yqq unzip
 
 RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
 
-COPY . /web_scraper
-WORKDIR /web_scraper
+COPY . /web_scraper_project
+WORKDIR /web_scraper_project
 
 RUN pip install --upgrade pip
 
 RUN pip install -r requirements.txt
 
 ENTRYPOINT [ "python3", "-m", "web_scraper" ]
-
-CMD [ " " ]
