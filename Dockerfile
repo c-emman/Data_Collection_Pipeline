@@ -1,4 +1,25 @@
-FROM python:3.8
+FROM python:3.8-slim-bullseye as base
+
+FROM base as builder
+
+RUN mkdir /install
+WORKDIR /install
+
+RUN pip install --upgrade pip
+
+FROM base
+
+COPY requirements.txt /requirements.txt
+
+RUN pip install -r /requirements.txt
+
+COPY --from=builder  /install  /usr/local/
+
+RUN apt-get update && apt-get install -y gnupg
+
+RUN  apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/listssudo/*
+
+RUN apt-get update && apt-get install -y curl
 
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
 
@@ -16,9 +37,5 @@ RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
 
 COPY . /web_scraper_project
 WORKDIR /web_scraper_project
-
-RUN pip install --upgrade pip
-
-RUN pip install -r requirements.txt
 
 ENTRYPOINT [ "python3", "-m", "web_scraper" ]
