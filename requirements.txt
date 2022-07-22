@@ -1,5 +1,8 @@
-# This is a file which has all the necessary dependancies needed
-#in order to properly run the web_scrpaer module
+awscli==1.25.24
 boto3==1.24.24
-selenium==4.3.0
+botocore==1.27.24
+psycopg2-binary==2.9.3
+s3transfer==0.6.0
+selenium==4.2.0
 SQLAlchemy==1.4.39
+urllib3==1.26.9
