@@ -24,6 +24,8 @@ class Scraper:
         
         """
         options = webdriver.ChromeOptions()
+        options.add_argument(Driver_Configuration.DISABLE_DEV_SHM)
+        options.add_argument(Driver_Configuration.NO_SANDBOX)
         options.add_argument(Driver_Configuration.HEADLESS)
         options.add_argument(Driver_Configuration.USER_AGENT) 
         options.add_argument(Driver_Configuration.WINDOW_SIZE) 
