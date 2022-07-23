@@ -3,8 +3,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from web_scraper.config import AnyEc, Configuration_XPATH, Db_Config
 from web_scraper.scraper import Scraper
-from sqlalchemy import select
-import pandas as pd
 import tempfile
 import argparse
 import sqlalchemy
@@ -13,7 +11,6 @@ import uuid
 import os
 import json
 import urllib.request
-import psycopg2
 
 class Item_Scraper(Scraper):
 
@@ -52,7 +49,7 @@ class Item_Scraper(Scraper):
             print('Will scrape Mens, Womens and Kids departments.')
         
         if self.args.cloud is True:
-            print('Documents will not save locally; will save to AWS S3 and RDS only.')
+            print('Documents will save to AWS S3 and RDS only.')
         elif self.args.locally is True:
             print('Documents will save locally only.')
         else:
@@ -270,7 +267,8 @@ class Item_Scraper(Scraper):
             else:
                 with tempfile.TemporaryDirectory() as tempdir:
                     self.download_images(image_dict["link"], f'{tempdir}/{product_dict["product_no"]}_{str(a)}')
-                    self.upload_data_s3(f'{tempdir}/{product_dict["product_no"]}_{str(a)}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
+                    tempdir_img = f'{tempdir}/{product_dict["product_no"]}_{str(a)}'
+                    self.upload_data_s3(f'{tempdir_img}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
                 b += 1
             a+=1
         if self.args.locally is False:
