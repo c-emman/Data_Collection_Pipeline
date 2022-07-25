@@ -21,7 +21,6 @@ class Item_Scraper(Scraper):
         self.department = str()
         self.category = str()
         self.subcategory = str()
-        self.list_max = 2
         self.s3_client = boto3.client('s3')
         self.bucketname = 'chris-aircore-s3bucket'
         self.parser = argparse.ArgumentParser(description='Item Scraper class which will scrape products from website.')
@@ -30,20 +29,23 @@ class Item_Scraper(Scraper):
         self.parser.add_argument("-k", "--kids", help='Scrape only the Kids department.', default=False, action='store_true')
         self.parser.add_argument("-l", "--locally", help='Save scraped data on local machine only.', default=False, action='store_true')
         self.parser.add_argument("-c", "--cloud", help='Upload data to S3 and AWS RDS only.', default=False, action='store_true')
+        self.parser.add_argument("-n", "--number", help='Maximum number of items per category to scrape.', default=20, action='store')
         self.args = self.parser.parse_args()
+        self.list_max = int(self.args.number)
+        print(f'Scraper will scrape {self.list_max} items per category')
         self.flag = False
         if self.args.locally is False:
             self.engine = sqlalchemy.create_engine(f'{Db_Config.DATABASE_TYPE}+{Db_Config.DBAPI}://{Db_Config.USER}:{Db_Config.PASSWORD}@{Db_Config.ENDPOINT}:{Db_Config.PORT}/{Db_Config.DATABASE}')
         self.products_scraped_cloud = list()
         self.dep_list = Configuration_XPATH.DEP_LIST
         if self.args.men is True:
-            self.dep_list = list(Configuration_XPATH.DEP_LIST[0])
+            self.dep_list = [Configuration_XPATH.DEP_LIST[0]]
             print('Will scrape only the Mens department.')
         elif self.args.women is True:
-            self.dep_list = list(Configuration_XPATH.DEP_LIST[1])
+            self.dep_list = [Configuration_XPATH.DEP_LIST[1]]
             print('Will scrape only the Womens department.')
         elif self.args.kids is True:
-            self.dep_list = list(Configuration_XPATH.DEP_LIST[2])
+            self.dep_list = [Configuration_XPATH.DEP_LIST[2]]
             print('Will scrape only the Kids department.')
         else:
             print('Will scrape Mens, Womens and Kids departments.')
@@ -65,7 +67,8 @@ class Item_Scraper(Scraper):
         self.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
         self.load_and_reject_promotion()    
         
-        for department in self.dep_list:
+        for i in range(len(self.dep_list)):
+            department = self.dep_list[i]
             self.department = department
             if self.args.locally is False:
                 self.engine.execute(f'''CREATE SCHEMA IF NOT EXISTS {self.department}_data''')
@@ -119,6 +122,7 @@ class Item_Scraper(Scraper):
             None
         """
         for link in self.link_list[:self.max_items]:
+            self.flag = False
             self.driver.get(link)
             path = Configuration_XPATH.RAW_DATA_PATH + f'/{self.department}/{self.category}/{self.subcategory}'
             self.create_dir(path)
