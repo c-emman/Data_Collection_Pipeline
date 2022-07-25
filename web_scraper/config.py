@@ -73,6 +73,13 @@ class Db_Config:
     PORT = 5432
     DATABASE = 'postgres'
 
+class S3_Config:
+    def __init__(self) -> None:
+        pass
+
+    REGION = 'us-west-1'
+    ACCESS_KEY = 'AKIAWF44ZTMTLPEFWIMM'
+    SECRET_KEY = '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'
 
 class AnyEc:
     """ 
