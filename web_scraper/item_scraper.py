@@ -1,7 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from web_scraper.config import AnyEc, Configuration_XPATH, Db_Config
+from web_scraper.config import AnyEc, Configuration_XPATH, Db_Config, S3_Config
 from web_scraper.scraper import Scraper
 import tempfile
 import argparse
@@ -21,7 +21,7 @@ class Item_Scraper(Scraper):
         self.department = str()
         self.category = str()
         self.subcategory = str()
-        self.s3_client = boto3.client('s3')
+        self.s3_client = boto3.client('s3', region_name=S3_Config.REGION, aws_access_key_id=S3_Config.ACCESS_KEY, aws_secret_access_key=S3_Config.SECRET_KEY)
         self.bucketname = 'chris-aircore-s3bucket'
         self.parser = argparse.ArgumentParser(description='Item Scraper class which will scrape products from website.')
         self.parser.add_argument( "-m", "--men", help='Scrape only the Mens department.', default=False, action='store_true')
@@ -210,12 +210,14 @@ class Item_Scraper(Scraper):
         return product_dict
 
     def clean_product_data(self, product_dict: dict, images_link_list: list):
+
         value_1 = f"'{product_dict['uuid']}'"
         value_2 = f"'{product_dict['product_no']}'"
-        value_3 = f"'{product_dict['brand']}'"
+        tranform_3 = product_dict['brand'].replace("'s", "s").replace("'", ".")
+        value_3 = f"'{tranform_3}'"
         transform_4 = product_dict['product_info'].replace("'s", "s").replace("'", ".")
         value_4 = f"'{transform_4}'"
-        value_5 = float(product_dict['price'][1:].replace(",", ""))
+        value_5 = float(product_dict['price'][1:].replace(",", "").replace("\u200c", ""))
         if 'size_and_fit' in product_dict:
             transform_6 = product_dict['size_and_fit'].replace("'s", "s").replace("'", ".")
             value_6 = f"'{transform_6}'"
