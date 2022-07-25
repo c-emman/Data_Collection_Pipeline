@@ -32,7 +32,6 @@ class Item_Scraper(Scraper):
         self.parser.add_argument("-n", "--number", help='Maximum number of items per category to scrape.', default=20, action='store')
         self.args = self.parser.parse_args()
         self.list_max = int(self.args.number)
-        print(f'Scraper will scrape {self.list_max} items per category')
         self.flag = False
         if self.args.locally is False:
             self.engine = sqlalchemy.create_engine(f'{Db_Config.DATABASE_TYPE}+{Db_Config.DBAPI}://{Db_Config.USER}:{Db_Config.PASSWORD}@{Db_Config.ENDPOINT}:{Db_Config.PORT}/{Db_Config.DATABASE}')
@@ -56,6 +55,8 @@ class Item_Scraper(Scraper):
             print('Documents will save locally only.')
         else:
             print('Documents will be saved both locally and on AWS cloud.')
+        
+        print(f'Scraper will scrape {self.list_max} items per category')
 
     def run_full_scrape(self) -> None:
         """
