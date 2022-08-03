@@ -7,6 +7,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from web_scraper.config import Configuration_XPATH, Driver_Configuration
 import time
+import regex
 
 class Scraper:
     """
@@ -130,7 +131,8 @@ class Scraper:
                         print("Promotion has been closed!")
                         break
                     except TimeoutException:
-                        print("No promotion pop-up this time!")            
+                        #print("No promotion pop-up this time!")  
+                        a+=1         
             except:
                 a+=1
                 continue 
@@ -167,18 +169,21 @@ class Scraper:
         WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))))
         department_button = self.driver.find_element(By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))
         self.driver.get(department_button.get_attribute('href'))
+        print(f'Scraper has clicked on the {department} department.')
         time.sleep(5)
 
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH))>0:
+            WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
+            shop_department_button = self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)
             try:
-                WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
-                shop_department_button = self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)
                 shop_department_button[3].click()
-                time.sleep(5)
+                print(f'The {department} department button has been clicked.')
+                time.sleep(2)
             except: 
-                pass
-        
-
+                shop_department_button[0].click()
+                print(f'The {department} department button has been clicked.')
+                time.sleep(2)
+            
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.choose_categories_dropdown_xpath)) >0:
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.choose_category_button)))
             category_dropdown = self.driver.find_element(By.XPATH, Configuration_XPATH.choose_category_button)
@@ -192,9 +197,9 @@ class Scraper:
 
         for element in choose_categories:
             category_dict = dict()
-            index = int(len(Configuration_XPATH.WEBSITE)) + int(len(department)) + 2
             category_dict["department"] = department
-            category_dict["category"] = element.get_attribute('href')[index:-1].replace("-", "_")
+            regex_list = regex.split('/', element.get_attribute('href')) 
+            category_dict["category"] = regex_list[-2].replace("-", "_")
             category_dict["link"] = element.get_attribute('href')
             category_dict_list.append(category_dict)
         return category_dict_list
@@ -230,19 +235,16 @@ class Scraper:
                 full_scrape_dict["department"] = category_dict["department"]
                 full_scrape_dict["category"] = category_dict["category"]
                 full_scrape_dict["category_link"] = category_dict["link"]
-                index = int(len(Configuration_XPATH.WEBSITE))+ int(len(category_dict["department"])) +int(len(category_dict["category"])) + 3
-                full_scrape_dict["subcategory"] = element.get_attribute('href')[index:-1].replace("-", "_")
+                regex_list = regex.split('/', element.get_attribute('href'))
+                full_scrape_dict["subcategory"] = regex_list[-2].replace("-", "_")
                 full_scrape_dict["subcategory_link"] = element.get_attribute('href')
                 full_scrape_list.append(full_scrape_dict)
             a+=1
         return full_scrape_list 
 
-    def get_links(self, index :int) -> list:
+    def get_links(self, subcategory:str, department:str) -> list:
         """
         This function visits a sub-category and gets a list of all the links to all the items in the subcategory
-
-        Args:
-            index (int): An index used to slice the URL and obtain the number of pages to scrape in the subcategory
 
         Returns:
            link_list (list): A list of links to all the items within a subcategory
@@ -251,10 +253,10 @@ class Scraper:
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)) > 0:
             pagination_xpaths = self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)
             pagination = pagination_xpaths[-2].get_attribute('href')
-            pagination_no = int(pagination[index:-1]) 
+            regex_list = regex.split('/', pagination)
+            pagination_no = int(regex_list[-2][5:]) 
         else:
             pagination_no = 0
-
         a =0
         if a == pagination_no:
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
@@ -268,7 +270,6 @@ class Scraper:
             return link_list
         else:
             while True:
-
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
                 item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
                 item_list = item_container.find_elements(By.XPATH, './div')
@@ -281,8 +282,9 @@ class Scraper:
                 a+= 1
                 
                 if a == (pagination_no):
-                    print("Links on this page have been scraped")
+                    print(f"Links on the {department} {subcategory} department pages have been scraped")
                     return link_list
 
-                paginagion_link = str(pagination[:index]) + f'{a+1}/'    
+                index = str(pagination).index('=')
+                paginagion_link = str(pagination[:index+1]) + f'{a+1}/'    
                 self.driver.get(paginagion_link)
