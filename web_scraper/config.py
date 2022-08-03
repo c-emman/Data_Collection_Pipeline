@@ -38,7 +38,7 @@ class Configuration_XPATH:
     SIZE_AND_FIT_INACTIVE_XPATH = '//h4[@class="p-more-info__heading "][text()="Size & Fit"]'
     BRAND_BIO_INACTIVE_XPATH = '//h4[@class="p-more-info__heading "][text()="Brand Bio"]'
     price_sale_xpath = '//p[@class="product-price__old  "]'
-    promotion_box = '//div[@id="mf__div"][@aria-hidden="true"]'
+    promotion_box = '//div[@id="page"][@aria-hidden="true"]'
     pagination_xpath = '//ul[@class="pagination__links"]//a'
     choose_categories_dropdown_xpath = '//section[@class="filter-group pr-filter-group-categories"]//h3[@class="filter-group__title filter-group__title--closed"]'
     choose_category_button = '//section[@class="filter-group pr-filter-group-categories"]//h3'
