@@ -1,6 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from web_scraper.config import AnyEc, Configuration_XPATH, Db_Config, S3_Config
 from web_scraper.scraper import Scraper
 import tempfile
@@ -94,8 +95,7 @@ class Item_Scraper(Scraper):
             self.category = full_scrape_dict["category"]
             self.subcategory = full_scrape_dict["subcategory"]
             self.driver.get(subcategory_link)
-            index = int(len(Configuration_XPATH.WEBSITE)) + int(len(self.department)) + int(len(self.category)) + int(len(self.subcategory)) + 10
-            self.link_list = self.get_links(index)
+            self.link_list = self.get_links(self.subcategory, self.department)
             self.max_items = min(self.list_max, len(self.link_list))
             if self.args.locally is False:
                 self.engine.execute(f'''CREATE TABLE IF NOT EXISTS {self.department}_data.{self.subcategory} (
@@ -174,41 +174,50 @@ class Item_Scraper(Scraper):
             dict
         """
         product_dict = dict()
-        WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.product_no_xpath)))
-        if self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text in self.products_scraped_cloud:
-            product_no = self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text
-            print(f'Information for product: {product_no} has already been scraped')
-            self.flag =  True
-        else:
-            product_dict["uuid"] = str(uuid.uuid4())
-            product_dict["product_no"] = self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text     
-            product_dict["brand"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_xpath).text
-            product_dict["product_info"] = self.driver.find_element(By.XPATH, Configuration_XPATH.product_info_xpath).text
-            product_dict["price"] = WebDriverWait(self.driver, self.delay).until(AnyEc(EC.presence_of_element_located((By.XPATH,Configuration_XPATH.price_xpath)), EC.presence_of_element_located((By.XPATH, Configuration_XPATH.price_sale_xpath)))).text
-            self.driver.execute_script("window.scrollTo(0, 500);")
-            if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
-                product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text    
-            else:
-                try:
-                    WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)))
-                    size_and_fit_button = self.driver.find_element(By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)
-                    size_and_fit_button.click()
-                    product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text
-                except:
-                    pass
-            
-            if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "brand bio":
-                product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text   
-            else:
-                try:
-                    WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)))
-                    brand_bio_button =  self.driver.find_element(By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)
-                    brand_bio_button.click()
-                    product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text
-                except:
-                    pass
-        return product_dict
-
+        a = 0
+        while True:
+            if a == 3:
+                print(f'Item page did not load. Unable to scrape item data for item in {self.department} {self.subcategory} department.')
+                self.flag =  True
+                return product_dict
+            try:
+                WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.product_no_xpath)))
+                if self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text in self.products_scraped_cloud:
+                    product_no = self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text
+                    print(f'Information for product: {product_no} has already been scraped')
+                    self.flag =  True
+                else:
+                    product_dict["uuid"] = str(uuid.uuid4())
+                    product_dict["product_no"] = self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text     
+                    product_dict["brand"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_xpath).text
+                    product_dict["product_info"] = self.driver.find_element(By.XPATH, Configuration_XPATH.product_info_xpath).text
+                    product_dict["price"] = WebDriverWait(self.driver, self.delay).until(AnyEc(EC.presence_of_element_located((By.XPATH,Configuration_XPATH.price_xpath)), EC.presence_of_element_located((By.XPATH, Configuration_XPATH.price_sale_xpath)))).text
+                    self.driver.execute_script("window.scrollTo(0, 500);")
+                    if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
+                        product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text    
+                    else:
+                        try:
+                            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)))
+                            size_and_fit_button = self.driver.find_element(By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)
+                            size_and_fit_button.click()
+                            product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text
+                        except:
+                            pass
+                    
+                    if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "brand bio":
+                        product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text   
+                    else:
+                        try:
+                            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)))
+                            brand_bio_button =  self.driver.find_element(By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)
+                            brand_bio_button.click()
+                            product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text
+                        except:
+                            pass
+                return product_dict
+            except TimeoutException:
+                a+=1
+        
     def clean_product_data(self, product_dict: dict, images_link_list: list):
 
         value_1 = f"'{product_dict['uuid']}'"
