@@ -250,6 +250,7 @@ class Scraper:
            link_list (list): A list of links to all the items within a subcategory
         """
         link_list = []
+        time.sleep(2)
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)) > 0:
             pagination_xpaths = self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)
             pagination = pagination_xpaths[-2].get_attribute('href')
@@ -264,9 +265,11 @@ class Scraper:
             item_list = item_container.find_elements(By.XPATH, './div')
 
             for item in item_list:
+                link_dict = dict()
                 a_tag = item.find_element(By.TAG_NAME, 'a')
-                _link = a_tag.get_attribute('href')
-                link_list.append(_link)
+                link_dict["link"] = a_tag.get_attribute('href')
+                link_dict["product_no"] = a_tag.get_attribute('data-secondid')
+                link_list.append(link_dict)
             return link_list
         else:
             while True:
@@ -275,9 +278,11 @@ class Scraper:
                 item_list = item_container.find_elements(By.XPATH, './div')
 
                 for item in item_list:
+                    link_dict = dict()
                     a_tag = item.find_element(By.TAG_NAME, 'a')
-                    _link = a_tag.get_attribute('href')
-                    link_list.append(_link)
+                    link_dict["link"] = a_tag.get_attribute('href')
+                    link_dict["product_no"] = a_tag.get_attribute('data-secondid')
+                    link_list.append(link_dict)
                 
                 a+= 1
                 
