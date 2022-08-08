@@ -32,49 +32,6 @@ class Scraper:
         self.website = website
         self.delay = 20
         
-    def scroll(self) -> None:
-        '''This function allows the user to scroll a webpage.
-        
-        Returns:
-            None
-        '''
-        self.driver.execute_script("window.scrollTo(0, 500);")
-    
-    def browse_next(self) -> webdriver:
-        """This function allows the user to move from page to page by clicking on the next page button
-
-        Returns:
-           self.driver (webdriver): _description_The current webpage so the information is not lost
-        """
-        self.driver.execute_script("window.scrollTo(0 , document.body.scrollHeight);")
-        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.next_page_xpath)))
-        next_page = self.driver.find_element(By.XPATH, Configuration_XPATH.next_page_xpath) 
-        next_page.click()
-        return self.driver
-
-    def search(self) -> None:
-        """This function allows the user to search the webpage with a desired search term.
-
-        Returns:
-            None
-        """
-        search_bar = self.driver.find_element(By.XPATH, Configuration_XPATH.search_xpath)
-        search_bar.click()
-        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.search_input_xpath)))
-        enter_keys = self.driver.find_element(By.XPATH, Configuration_XPATH.search_input_xpath)
-
-        while True:
-            search_input = str(input("Enter a search term: "))
-            if len(search_input) > 0:
-                print(f'.....Program will begin searching for {search_input} ......')
-                break
-            else:
-                print("Please enter a search term")
-
-        enter_keys.send_keys(search_input)
-        enter_keys.send_keys(Keys.RETURN)
-        print(f'Search for {search_input} has been entered')
-    
     def load_and_accept_cookies(self, website: str) -> None:
         """This function will wait for the page to load and accept page cookies
 
@@ -131,20 +88,6 @@ class Scraper:
                 a+=1
                 continue 
     
-    def ask_department(self) -> str:
-        """This fucntion will ask the department which is desired to be scraped, i.e Men or Women
-
-        Returns:
-            department (str): The department which is to be scraped
-        """
-        while True:
-            department = str(input("Enter either the Men or Women's department to scrape: ")).lower().capitalize()
-            if department == 'Men' or department == 'Women':
-                print(f'Program will beginning scraping the {department}s data')
-                return department
-            else:
-                print("Please enter either the Men or Women department")
-
     def get_categories(self, department:str) -> list:
         """This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
 
@@ -162,28 +105,11 @@ class Scraper:
         time.sleep(5)
 
         # Function will check if there is a second button to press depending on the department which is clicked
-        if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH))>0:
-            WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
-            shop_department_button = self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)
-            try:
-                # If kids department is clicked will locate the unisex department button.
-                shop_department_button[3].click()
-                print(f'The {department} department button has been clicked.')
-                time.sleep(2)
-            except: 
-                # Otherwise will click on the department button.
-                shop_department_button[0].click()
-                print(f'The {department} department button has been clicked.')
-                time.sleep(2)
+        self.locate_department_page(department)
             
         # Will check if the category department dropdown is open, if not will click it to open it.
-        if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.choose_categories_dropdown_xpath)) >0:
-            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.choose_category_button)))
-            category_dropdown = self.driver.find_element(By.XPATH, Configuration_XPATH.choose_category_button)
-            category_dropdown.click()
-            print('Category dropdown menu clicked')
-        else:
-            pass
+        self.category_dropdown()
+
         # Will set the categories links to a list
         choose_categories = self.driver.find_elements(By.XPATH, Configuration_XPATH.CHOOSE_CATEGORIES_XPATH)
         category_dict_list = []
@@ -197,7 +123,7 @@ class Scraper:
             category_dict["link"] = element.get_attribute('href')
             category_dict_list.append(category_dict)
         return category_dict_list
- 
+
     def get_subcategories_links(self, category_dict_list: list) -> list:
         """This function will create a list of all the items to be scraped by creating a list of dicts
 
@@ -249,41 +175,23 @@ class Scraper:
         link_list = []
         time.sleep(2)
         # Checks whether the page length is 1 or more, if more than one will obtain the total number of pages, if 1 then will set the pagination_no to 0
-        if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)) > 0:
-            pagination_xpaths = self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)
-            pagination = pagination_xpaths[-2].get_attribute('href')
-            regex_list = regex.split('/', pagination)
-            pagination_no = int(regex_list[-2][5:]) 
-        else:
-            pagination_no = 0
+        pagination_tuple = self.get_pagination()
+        pagination_no = pagination_tuple[0]
+        pagination = pagination_tuple[1]
+
         a =0
         # If the pagination_no is 0 then will only get the links to the items on the page
         if a == pagination_no:
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
-            item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
-            item_list = item_container.find_elements(By.XPATH, './div')
-
-            for item in item_list:
-                link_dict = dict()
-                a_tag = item.find_element(By.TAG_NAME, 'a')
-                link_dict["link"] = a_tag.get_attribute('href')
-                link_dict["product_no"] = a_tag.get_attribute('data-secondid')
-                link_list.append(link_dict)
+            page_link_list = self.get_page_links()
+            link_list += page_link_list
             return link_list
         # If the pagination_no is greater than zero will iterate through the pages and obtain the links on each page.
         else:
             while True:
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
-                item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
-                item_list = item_container.find_elements(By.XPATH, './div')
-
-                for item in item_list:
-                    link_dict = dict()
-                    a_tag = item.find_element(By.TAG_NAME, 'a')
-                    link_dict["link"] = a_tag.get_attribute('href')
-                    link_dict["product_no"] = a_tag.get_attribute('data-secondid')
-                    link_list.append(link_dict)
-                
+                page_link_list = self.get_page_links()
+                link_list += page_link_list
                 a+= 1
                 # Once reached the final page will stop iterating 
                 if a == (pagination_no):
@@ -293,3 +201,133 @@ class Scraper:
                 index = str(pagination).index('=')
                 paginagion_link = str(pagination[:index+1]) + f'{a+1}/'    
                 self.driver.get(paginagion_link)
+
+    def locate_department_page(self, department:str):
+        """Will navigate to the correct department page if not currently on that page.
+
+        Args:
+            department (str): The department which is being scraped
+
+        Returns:
+            None
+        """
+        if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH))>0:
+            WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
+            shop_department_button = self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)
+            try:
+                # If kids department is clicked will locate the unisex department button.
+                shop_department_button[3].click()
+                print(f'The {department} department button has been clicked.')
+                time.sleep(2)
+            except: 
+                # Otherwise will click on the department button.
+                shop_department_button[0].click()
+                print(f'The {department} department button has been clicked.')
+                time.sleep(2)
+        else:
+            pass
+        
+    def category_dropdown(self):
+        """Will click the category dropdown button to display categories if categories are not currently being shown.
+
+        Returns:
+            None
+        """
+        if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.choose_categories_dropdown_xpath)) >0:
+            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.choose_category_button)))
+            category_dropdown = self.driver.find_element(By.XPATH, Configuration_XPATH.choose_category_button)
+            category_dropdown.click()
+            print('Category dropdown menu clicked')
+        else:
+            pass
+    
+    def get_page_links(self) -> list[dict]:
+        """Function to get the links on a single page and form into a list.
+
+        Returns:
+            page_link_list ( list[dict] ): A list of dictionaries with the link to an item and the items corresponding item number.
+        """
+        page_link_list = []
+        item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
+        item_list = item_container.find_elements(By.XPATH, './div')
+
+        for item in item_list:
+            link_dict = dict()
+            a_tag = item.find_element(By.TAG_NAME, 'a')
+            link_dict["link"] = a_tag.get_attribute('href')
+            link_dict["product_no"] = a_tag.get_attribute('data-secondid')
+            page_link_list.append(link_dict)
+        return page_link_list
+    
+    def get_pagination(self) -> tuple[int, str]:
+        """Will obtain the number of pages to iterate through and the base URL which can be concatenated.
+
+        Returns:
+            pagination_no, pagination ( tuple[int, str] ): Will give the pagination_no which is the total number of pages and the pagination
+            which is the base URL to be concatenated.
+        """
+        if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)) > 0:
+            pagination_xpaths = self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)
+            pagination = pagination_xpaths[-2].get_attribute('href')
+            regex_list = regex.split('/', pagination)
+            pagination_no = int(regex_list[-2][5:]) 
+        else:
+            pagination_no = 0    
+        return pagination_no, pagination
+
+    def ask_department(self) -> str:
+        """This fucntion will ask the department which is desired to be scraped, i.e Men or Women
+
+        Returns:
+            department (str): The department which is to be scraped
+        """
+        while True:
+            department = str(input("Enter either the Men or Women's department to scrape: ")).lower().capitalize()
+            if department == 'Men' or department == 'Women':
+                print(f'Program will beginning scraping the {department}s data')
+                return department
+            else:
+                print("Please enter either the Men or Women department")
+
+    def scroll(self) -> None:
+        '''This function allows the user to scroll a webpage.
+        
+        Returns:
+            None
+        '''
+        self.driver.execute_script("window.scrollTo(0, 500);")
+    
+    def browse_next(self) -> webdriver:
+        """This function allows the user to move from page to page by clicking on the next page button
+
+        Returns:
+           self.driver (webdriver): _description_The current webpage so the information is not lost
+        """
+        self.driver.execute_script("window.scrollTo(0 , document.body.scrollHeight);")
+        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.next_page_xpath)))
+        next_page = self.driver.find_element(By.XPATH, Configuration_XPATH.next_page_xpath) 
+        next_page.click()
+        return self.driver
+
+    def search(self) -> None:
+        """This function allows the user to search the webpage with a desired search term.
+
+        Returns:
+            None
+        """
+        search_bar = self.driver.find_element(By.XPATH, Configuration_XPATH.search_xpath)
+        search_bar.click()
+        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.search_input_xpath)))
+        enter_keys = self.driver.find_element(By.XPATH, Configuration_XPATH.search_input_xpath)
+
+        while True:
+            search_input = str(input("Enter a search term: "))
+            if len(search_input) > 0:
+                print(f'.....Program will begin searching for {search_input} ......')
+                break
+            else:
+                print("Please enter a search term")
+
+        enter_keys.send_keys(search_input)
+        enter_keys.send_keys(Keys.RETURN)
+        print(f'Search for {search_input} has been entered')

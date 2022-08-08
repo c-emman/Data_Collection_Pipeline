@@ -1,4 +1,3 @@
-from re import S
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -14,6 +13,7 @@ import os
 import json
 import urllib.request
 
+
 class Item_Scraper(Scraper):
 
     def __init__(self, *args, **kwargs) -> False:
@@ -24,8 +24,10 @@ class Item_Scraper(Scraper):
         self.category = str()
         self.subcategory = str()
         # Sets the S3 client connection and credentials
-        self.s3_client = boto3.client('s3', region_name=S3_Config.REGION, aws_access_key_id=S3_Config.ACCESS_KEY, aws_secret_access_key=S3_Config.SECRET_KEY)
         self.bucketname = 'chris-aircore-s3bucket'
+        self.s3_client = boto3.client('s3', region_name=S3_Config.REGION, aws_access_key_id=S3_Config.ACCESS_KEY, aws_secret_access_key=S3_Config.SECRET_KEY)
+        self.s3_resource = boto3.resource('s3', region_name=S3_Config.REGION, aws_access_key_id=S3_Config.ACCESS_KEY, aws_secret_access_key=S3_Config.SECRET_KEY)
+        self.s3_bucket = self.s3_resource.Bucket(self.bucketname)
         # Sets the optional arguments to pass to the scraper to scrape a specific category, whether to save locally or on the cloud and the maximum number 
         # of items to scrape
         self.parser = argparse.ArgumentParser(description='Item Scraper class which will scrape products from website.')
@@ -43,6 +45,7 @@ class Item_Scraper(Scraper):
             self.engine = sqlalchemy.create_engine(f'{Db_Config.DATABASE_TYPE}+{Db_Config.DBAPI}://{Db_Config.USER}:{Db_Config.PASSWORD}@{Db_Config.ENDPOINT}:{Db_Config.PORT}/{Db_Config.DATABASE}')
         # Sets the list of items to scrape on the cloud
         self.products_scraped_cloud = list()
+        self.images_scraped_cloud = list()
         self.dep_list = Configuration_XPATH.DEP_LIST
         if self.args.men is True:
             self.dep_list = [Configuration_XPATH.DEP_LIST[0]]
@@ -203,6 +206,181 @@ class Item_Scraper(Scraper):
             except TimeoutException:
                 a+=1
 
+    def clean_product_data(self, product_dict: dict, images_link_list: list) -> str:
+        """A function which cleans the data from the product_dict to allow it to be uploaded to AWS RDS PostgreSQL
+
+        Args:
+            product_dict (dict): Dictionary of the product details which have been scraped
+            images_link_list (list): A list containing the links to images of the product
+
+        Returns:
+            table insert (str): A str of the cleaned data which can be inserted into the Database via SQL
+        """
+        value_1 = f"'{product_dict['uuid']}'"
+        value_2 = f"'{product_dict['product_no']}'"
+        tranform_3 = product_dict['brand'].replace("'s", "s").replace("'", ".")
+        value_3 = f"'{tranform_3}'"
+        transform_4 = product_dict['product_info'].replace("'s", "s").replace("'", ".")
+        value_4 = f"'{transform_4}'"
+        value_5 = float(product_dict['price'][1:].replace(",", "").replace("\u200c", ""))
+        if 'size_and_fit' in product_dict:
+            transform_6 = product_dict['size_and_fit'].replace("'s", "s").replace("'", ".")
+            value_6 = f"'{transform_6}'"
+        else:
+            value_6 = "''"
+        if 'brand_bio' in product_dict:
+            transform_7 = product_dict['brand_bio'].replace("'s", "s").replace("'", ".")
+            value_7 = f"'{transform_7}'"
+        else:
+            value_7 = "''"
+        transform_8 = str(images_link_list).replace("'", "*")
+        value_8 = f"'{transform_8}'"
+        table_insert = f'({value_1}, {value_2}, {value_3}, {value_4}, {value_5}, {value_6}, {value_7}, {value_8})'
+        return table_insert
+    
+    def get_images(self, path_img: str, product_dict: dict) -> tuple[ list[dict], list]:
+        """The function will get all the images for an item and call a function to download the image
+
+        Args:
+            path_img (str): The PATH for the /images directory within the specified item directory
+            product_dict (dict): Dictionary of the data for a specfic item.
+
+        Returns:
+            images_list (list): A list of dicts for the image links for a specific item and the corresponding image name.
+            images_link_list (list): A list of links to the images.
+        """
+        # Obtains list of xpaths to images
+        images_list = []
+        images_link_list = []
+        images_xpath = self.driver.find_elements(By.XPATH, Configuration_XPATH.images_xpath)
+
+        a = 1 # Counter for pictures used for naming the picture
+        b = 0 # Counter for how many pictures were uploaded to S3
+        c = 0 # Counter for how many pictures were saved  locally
+        # Iterates through the list of images xpaths
+        for image in images_xpath:
+            # Creates the images dict with the image name and the link to the corresponding image
+            self.images_scraped_cloud = list()
+            image_dict = dict()
+            img_name = path_img + str(f'/{product_dict["product_no"]}_{a}')
+            image_dict["image_no"] = str(f'{product_dict["product_no"]}_{a}')
+            image_dict["link"] = image.get_attribute('src')
+            images_link_list.append(image.get_attribute('src'))
+            images_list.append(image_dict)
+            # If not specified to cloud then will download images and upload to S3 if product no in list of items already scraped.
+            if self.args.cloud is False:
+                if os.path.exists(img_name) == False:
+                    self.download_images(image_dict["link"], img_name)
+                    c += 1
+                else:
+                    print('Image has already been saved locally')
+
+                if_scraped = self.check_on_s3(product_dict, image_dict)
+                if if_scraped == True:
+                    continue
+                self.upload_data_s3(f'{img_name}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
+                b += 1
+            # If cloud is specified then will create a temporary directory download image, upload to S3 then close the temporary directory
+            else:
+                if_scraped = self.check_on_s3(product_dict, image_dict)
+                if if_scraped == True:
+                    continue
+                self.cloud_image_download(product_dict, image_dict, a)
+                b += 1
+            a+=1
+        if self.args.locally is False:
+            print(f'{b} images for product: {product_dict["product_no"]} have been uploaded to S3')
+        if self.args.cloud is False:
+            print(f'{c} images for product: {product_dict["product_no"]} have been saved locally')
+        return images_list, images_link_list
+
+    def cloud_image_download(self, product_dict: dict, image_dict: dict, a:int):
+        """Will directly download an image to AWS S3 and not save permanently to locall device
+
+        Args:
+            product_dict (dict): Dictionary of the product details which have been scraped
+            image_dict (dict): Dictionary of image name and links for a product
+            a (int): The image number of a specific image
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            self.download_images(image_dict["link"], f'{tempdir}/{product_dict["product_no"]}_{str(a)}')
+            tempdir_img = f'{tempdir}/{product_dict["product_no"]}_{str(a)}'
+            self.upload_data_s3(f'{tempdir_img}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
+    
+    def check_on_s3(self, product_dict: dict, image_dict: dict) -> bool:
+        """Will visit S3 and check whether the image has been put on S3
+
+        Args:
+            product_dict (dict): Dictionary of the product details which have been scraped
+        """
+        # obj = self.s3_client.list_objects(Bucket=self.bucketname, Prefix=f'{product_dict["product_no"]}', MaxKeys=10)
+        # for key in response['Contents']:
+        #     self.images_scraped_cloud.append(key['Key'])
+        objects = self.s3_bucket.objects.filter(Prefix=f'{product_dict["product_no"]}')
+        for object in objects:
+            self.images_scraped_cloud.append(object.key)
+        
+        print(self.images_scraped_cloud)
+
+        if image_dict["image_no"] in self.images_scraped_cloud:
+            print('Product image has already been uploaded to S3')
+            return True
+        else:
+            return False
+
+
+    def create_dir(self, PATH: str) -> None:
+        """This function will create a directory which does not exist
+
+        Args:
+            PATH (str): The desired PATH to create the directory
+
+        Return:
+            None
+        """
+        if self.args.cloud is False:
+            if os.path.exists(PATH) == False:
+                os.makedirs(PATH)
+
+    def create_json(self, product_dict: dict, item_path: str) -> None:
+        """The function will create a JSON file for a dictionary in a desired PATH
+
+        Args:
+            product_dict (dict): Dictionary of the data for a specfic item
+            item_path (str): The PATH where the data for a specified item will be located
+
+        Returns:
+            None
+        """
+        with open(f'{item_path}/data.json', 'w') as fp:
+            json.dump(product_dict, fp)
+
+    def download_images(self, image_link: str, img_name: str) -> None:
+        """This function downloads an image from a URL
+
+        Args:
+            image_link (str): The link to the image to be downloaded
+            img_name (str): The reference name for the image
+
+        Returns:
+            None
+        """
+        path  = img_name + '.jpg'
+        urllib.request.urlretrieve(image_link, path)
+
+    def upload_data_s3(self, filename, bucketname, object_name) -> None:
+        """A function which uploads an object to the AWS S3 bucket.
+
+        Args:
+            filename (str): The filename on the local machine
+            bucketname (str): The name of the S3 bucket where the object is to be dumped
+            object_name (str): The name to save the object as.
+        
+        Returns:
+            None
+        """
+        self.s3_client.upload_file(filename, bucketname, object_name)    
+        
     def get_uuid(self) -> str:
         """Function to generate a unique user id number
 
@@ -279,141 +457,6 @@ class Item_Scraper(Scraper):
                 brand_bio = None
         return brand_bio
 
-    def clean_product_data(self, product_dict: dict, images_link_list: list) -> str:
-        """A function which cleans the data from the product_dict to allow it to be uploaded to AWS RDS PostgreSQL
-
-        Args:
-            product_dict (dict): Dictionary of the product details which have been scraped
-            images_link_list (list): A list containing the links to images of the product
-
-        Returns:
-            table insert (str): A str of the cleaned data which can be inserted into the Database via SQL
+    def you_are_gay(self):
+        """_summary_
         """
-        value_1 = f"'{product_dict['uuid']}'"
-        value_2 = f"'{product_dict['product_no']}'"
-        tranform_3 = product_dict['brand'].replace("'s", "s").replace("'", ".")
-        value_3 = f"'{tranform_3}'"
-        transform_4 = product_dict['product_info'].replace("'s", "s").replace("'", ".")
-        value_4 = f"'{transform_4}'"
-        value_5 = float(product_dict['price'][1:].replace(",", "").replace("\u200c", ""))
-        if 'size_and_fit' in product_dict:
-            transform_6 = product_dict['size_and_fit'].replace("'s", "s").replace("'", ".")
-            value_6 = f"'{transform_6}'"
-        else:
-            value_6 = "''"
-        if 'brand_bio' in product_dict:
-            transform_7 = product_dict['brand_bio'].replace("'s", "s").replace("'", ".")
-            value_7 = f"'{transform_7}'"
-        else:
-            value_7 = "''"
-        transform_8 = str(images_link_list).replace("'", "*")
-        value_8 = f"'{transform_8}'"
-        table_insert = f'({value_1}, {value_2}, {value_3}, {value_4}, {value_5}, {value_6}, {value_7}, {value_8})'
-        return table_insert
-    
-    def get_images(self, path_img: str, product_dict: dict) -> list:
-        """The function will get all the images for an item and call a function to download the image
-
-        Args:
-            path_img (str): The PATH for the /images directory within the specified item directory
-            product_dict (dict): Dictionary of the data for a specfic item.
-
-        Returns:
-            images_list (list): A list of dicts for the image links for a specific item and the corresponding image name.
-            images_link_list (list): A list of links to the images.
-        """
-        # Obtains list of xpaths to images
-        images_list = []
-        images_link_list = []
-        images_xpath = self.driver.find_elements(By.XPATH, Configuration_XPATH.images_xpath)
-
-        a = 1 # Counter for pictures used for naming the picture
-        b = 0 # Counter for how many pictures were uploaded to S3
-        c = 0 # Counter for how many pictures were saved  locally
-        # Iterates through the list of images xpaths
-        for image in images_xpath:
-            # Creates the images dict with the image name and the link to the corresponding image
-            image_dict = dict()
-            img_name = path_img + str(f'/{product_dict["product_no"]}_{a}')
-            image_dict["image_no"] = str(f'{product_dict["product_no"]}_{a}')
-            image_dict["link"] = image.get_attribute('src')
-            images_link_list.append(image.get_attribute('src'))
-            images_list.append(image_dict)
-            # If not specified to cloud then will download images and upload to S3 if product no in list of items already scraped.
-            if self.args.cloud is False:
-                if os.path.exists(img_name) == False:
-                    self.download_images(image_dict["link"], img_name)
-                    c += 1
-                else:
-                    print('Image has already been saved locally')
-                
-                if product_dict["product_no"] in self.products_scraped_cloud:
-                    print('Product image has already been uploaded to S3')
-                else:
-                    self.upload_data_s3(f'{img_name}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
-                    b += 1
-            # If cloud is specified then will create a temporary directory download image, upload to S3 then close the temporary directory
-            else:
-                with tempfile.TemporaryDirectory() as tempdir:
-                    self.download_images(image_dict["link"], f'{tempdir}/{product_dict["product_no"]}_{str(a)}')
-                    tempdir_img = f'{tempdir}/{product_dict["product_no"]}_{str(a)}'
-                    self.upload_data_s3(f'{tempdir_img}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
-                b += 1
-            a+=1
-        if self.args.locally is False:
-            print(f'{b} images for product: {product_dict["product_no"]} have been uploaded to S3')
-        if self.args.cloud is False:
-            print(f'{c} images for product: {product_dict["product_no"]} have been saved locally')
-        return images_list, images_link_list
-
-    def create_dir(self, PATH: str) -> None:
-        """This function will create a directory which does not exist
-
-        Args:
-            PATH (str): The desired PATH to create the directory
-
-        Return:
-            None
-        """
-        if self.args.cloud is False:
-            if os.path.exists(PATH) == False:
-                os.makedirs(PATH)
-
-    def create_json(self, product_dict: dict, item_path: str) -> None:
-        """The function will create a JSON file for a dictionary in a desired PATH
-
-        Args:
-            product_dict (dict): Dictionary of the data for a specfic item
-            item_path (str): The PATH where the data for a specified item will be located
-
-        Returns:
-            None
-        """
-        with open(f'{item_path}/data.json', 'w') as fp:
-            json.dump(product_dict, fp)
-
-    def download_images(self, image_link: str, img_name: str) -> None:
-        """This function downloads an image from a URL
-
-        Args:
-            image_link (str): The link to the image to be downloaded
-            img_name (str): The reference name for the image
-
-        Returns:
-            None
-        """
-        path  = img_name + '.jpg'
-        urllib.request.urlretrieve(image_link, path)
-
-    def upload_data_s3(self, filename, bucketname, object_name) -> None:
-        """A function which uploads an object to the AWS S3 bucket.
-
-        Args:
-            filename (str): The filename on the local machine
-            bucketname (str): The name of the S3 bucket where the object is to be dumped
-            object_name (str): The name to save the object as.
-        
-        Returns:
-            None
-        """
-        self.s3_client.upload_file(filename, bucketname, object_name)
