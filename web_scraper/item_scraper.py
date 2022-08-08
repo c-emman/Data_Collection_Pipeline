@@ -1,3 +1,4 @@
+from re import S
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -161,16 +162,10 @@ class Item_Scraper(Scraper):
         
     def scrape_item_data(self) -> dict:
         """
-        This function scrapes the data for an individual item into a dict and saves that dict as a json file
-
-        Args:
-            link_list (list): A list of links to all the items within a subcategory
-            department (str): The department which is being scraped
-            category (str): The category the item is located in
-            sub_category (str): The sub-category the item is located in
+        This function scrapes the data for an individual item into a dict
 
         Returns:
-            dict
+            product_dict (dict): Dictionary of the product details which have been scraped
         """
         product_dict = dict()
         a = 0
@@ -181,39 +176,99 @@ class Item_Scraper(Scraper):
                 return product_dict
             try:
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.product_no_xpath)))
-                product_dict["uuid"] = str(uuid.uuid4())
-                # product_dict["product_no"] = self.driver.find_elements(By.XPATH, Configuration_XPATH.product_no_xpath)[0].text     
-                product_dict["brand"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_xpath).text
-                product_dict["product_info"] = self.driver.find_element(By.XPATH, Configuration_XPATH.product_info_xpath).text
-                product_dict["price"] = WebDriverWait(self.driver, self.delay).until(AnyEc(EC.presence_of_element_located((By.XPATH,Configuration_XPATH.price_xpath)), EC.presence_of_element_located((By.XPATH, Configuration_XPATH.price_sale_xpath)))).text
+                product_dict["uuid"] = self.get_uuid()     
+                product_dict["brand"] = self.get_brand()
+                product_dict["product_info"] = self.get_product_info()
+                product_dict["price"] = self.get_price()
                 self.driver.execute_script("window.scrollTo(0, 500);")
-                if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
-                    product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text    
-                else:
-                    try:
-                        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)))
-                        size_and_fit_button = self.driver.find_element(By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)
-                        size_and_fit_button.click()
-                        product_dict["size_and_fit"] = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text
-                    except:
-                        pass
-                
-                if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "brand bio":
-                    product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text   
-                else:
-                    try:
-                        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)))
-                        brand_bio_button =  self.driver.find_element(By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)
-                        brand_bio_button.click()
-                        product_dict["brand_bio"] = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text
-                    except:
-                        pass
+                product_dict["size_and_fit"] = self.get_size_and_fit()
+                product_dict["brand_bio"] = self.get_brand_bio() 
                 return product_dict
             except TimeoutException:
                 a+=1
-        
-    def clean_product_data(self, product_dict: dict, images_link_list: list):
 
+    def get_uuid(self) -> str:
+        """Function to generate a unique user id number
+
+        Returns:
+            _product_uuid (str): The unique user id
+        """
+        product_uuid = str(uuid.uuid4())
+        return product_uuid
+
+    def get_brand(self) -> str:
+        """Function to return the brand of a product
+
+        Returns:
+            brand (str): The product brand
+        """
+        brand  = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_xpath).text
+        return brand
+
+    def get_product_info(self) -> str:
+        """Function which gets a description of the product information
+
+        Returns:
+            product_info (str): The product information
+        """
+        product_info = self.driver.find_element(By.XPATH, Configuration_XPATH.product_info_xpath).text
+        return product_info
+
+    def get_price(self) -> str:
+        """Function which gets the product price.
+
+        Returns:
+            price (str): The product price
+        """
+        price = WebDriverWait(self.driver, self.delay).until(AnyEc(EC.presence_of_element_located((By.XPATH,Configuration_XPATH.price_xpath)), EC.presence_of_element_located((By.XPATH, Configuration_XPATH.price_sale_xpath)))).text
+        return price
+    
+    def get_size_and_fit(self) -> str:
+        """Function to get the size & fit description of a product
+
+        Returns:
+            size_and_fit (str): A description of the size and fit of a product 
+        """
+        if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
+            size_and_fit = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text    
+        else:
+            try:
+                WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)))
+                size_and_fit_button = self.driver.find_element(By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)
+                size_and_fit_button.click()
+                size_and_fit = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text
+            except:
+                size_and_fit = None
+        return size_and_fit
+
+    def get_brand_bio(self) -> str:
+        """Function which gets the brand bio information for a product should it exist
+
+        Returns:
+            brand_bio (str): A str of the brand bio of a product
+        """
+        if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "brand bio":
+            brand_bio = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text   
+        else:
+            try:
+                WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)))
+                brand_bio_button =  self.driver.find_element(By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)
+                brand_bio_button.click()
+                brand_bio = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text
+            except:
+                brand_bio = None
+        return brand_bio
+
+    def clean_product_data(self, product_dict: dict, images_link_list: list) -> str:
+        """A function which cleans the data from the product_dict to allow it to be uploaded to AWS RDS PostgreSQL
+
+        Args:
+            product_dict (dict): Dictionary of the product details which have been scraped
+            images_link_list (list): A list containing the links to images of the product
+
+        Returns:
+            table insert (str): A str of the cleaned data which can be inserted into the Database via SQL
+        """
         value_1 = f"'{product_dict['uuid']}'"
         value_2 = f"'{product_dict['product_no']}'"
         tranform_3 = product_dict['brand'].replace("'s", "s").replace("'", ".")
@@ -237,15 +292,15 @@ class Item_Scraper(Scraper):
         return table_insert
     
     def get_images(self, path_img: str, product_dict: dict) -> list:
-        """
-        The function will get all the images for an item and call a function to download the image
+        """The function will get all the images for an item and call a function to download the image
 
         Args:
             path_img (str): The PATH for the /images directory within the specified item directory
             product_dict (dict): Dictionary of the data for a specfic item.
 
         Returns:
-            images_list (list): A list of the image links for a specific item.
+            images_list (list): A list of dicts for the image links for a specific item and the corresponding image name.
+            images_link_list (list): A list of links to the images.
         """
         images_list = []
         images_link_list = []
@@ -253,19 +308,18 @@ class Item_Scraper(Scraper):
 
         a = 1
         b = 0
+        c = 0
         for image in images_xpath:
             image_dict = dict()
-            if self.args.locally is True and os.path.exists(path_img + str(f'/{product_dict["product_no"]}_{a}')):
-                print('Image data has already been saved locally.')
-                continue
+            img_name = path_img + str(f'/{product_dict["product_no"]}_{a}')
             image_dict["image_no"] = str(f'{product_dict["product_no"]}_{a}')
             image_dict["link"] = image.get_attribute('src')
             images_link_list.append(image.get_attribute('src'))
-            img_name = path_img + str(f'/{product_dict["product_no"]}_{a}')
             images_list.append(image_dict)
             if self.args.cloud is False:
                 if os.path.exists(img_name) == False:
                     self.download_images(image_dict["link"], img_name)
+                    c += 1
                 else:
                     print('Image has already been saved locally')
                 
@@ -283,11 +337,12 @@ class Item_Scraper(Scraper):
             a+=1
         if self.args.locally is False:
             print(f'{b} images for product: {product_dict["product_no"]} have been uploaded to S3')
+        if self.args.cloud is False:
+            print(f'{c} images for product: {product_dict["product_no"]} have been saved locally')
         return images_list, images_link_list
 
     def create_dir(self, PATH: str) -> None:
-        """
-        This function will create a directory which does not exist
+        """This function will create a directory which does not exist
 
         Args:
             PATH (str): The desired PATH to create the directory
@@ -300,8 +355,7 @@ class Item_Scraper(Scraper):
                 os.makedirs(PATH)
 
     def create_json(self, product_dict: dict, item_path: str) -> None:
-        """
-        The function will create a JSON file for a dictionary in a desired PATH
+        """The function will create a JSON file for a dictionary in a desired PATH
 
         Args:
             product_dict (dict): Dictionary of the data for a specfic item
@@ -314,8 +368,7 @@ class Item_Scraper(Scraper):
             json.dump(product_dict, fp)
 
     def download_images(self, image_link: str, img_name: str) -> None:
-        """
-        This function downloads an image from a URL
+        """This function downloads an image from a URL
 
         Args:
             image_link (str): The link to the image to be downloaded
@@ -327,5 +380,15 @@ class Item_Scraper(Scraper):
         path  = img_name + '.jpg'
         urllib.request.urlretrieve(image_link, path)
 
-    def upload_data_s3(self, filename, bucketname, object_name):
+    def upload_data_s3(self, filename, bucketname, object_name) -> None:
+        """A function which uploads an object to the AWS S3 bucket.
+
+        Args:
+            filename (str): The filename on the local machine
+            bucketname (str): The name of the S3 bucket where the object is to be dumped
+            object_name (str): The name to save the object as.
+        
+        Returns:
+            None
+        """
         self.s3_client.upload_file(filename, bucketname, object_name)
