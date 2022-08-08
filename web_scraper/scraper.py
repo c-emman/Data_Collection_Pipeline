@@ -159,7 +159,7 @@ class Scraper:
         This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
 
         Args:
-            department (str): The departemnt which is to be scraped, i.e Men or Women
+            department (str): The departemnt which is to be scraped, i.e Men, Women or Kids
 
         Returns:
             category_dict_list (list): A list which each element contains a dictionary with the main categories
@@ -245,6 +245,10 @@ class Scraper:
     def get_links(self, subcategory:str, department:str) -> list:
         """
         This function visits a sub-category and gets a list of all the links to all the items in the subcategory
+
+        Args:
+            subcategory (str): The current subcategory to be scraped
+            department (str): The department which is being scraped
 
         Returns:
            link_list (list): A list of links to all the items within a subcategory
