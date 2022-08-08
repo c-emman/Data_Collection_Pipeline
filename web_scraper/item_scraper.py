@@ -456,7 +456,3 @@ class Item_Scraper(Scraper):
             except:
                 brand_bio = None
         return brand_bio
-
-    def you_are_gay(self):
-        """_summary_
-        """
