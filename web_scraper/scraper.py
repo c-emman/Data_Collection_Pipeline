@@ -19,10 +19,7 @@ class Scraper:
     
     """
     def __init__(self, website: str) -> None:
-        """
-        See help(Scraper) for more information
-
-        
+        """See help(Scraper) for more information
         """
         options = webdriver.ChromeOptions()
         options.add_argument(Driver_Configuration.DISABLE_DEV_SHM)
@@ -35,8 +32,7 @@ class Scraper:
         self.delay = 20
         
     def scroll(self) -> None:
-        '''
-        This function allows the user to scroll a webpage.
+        '''This function allows the user to scroll a webpage.
         
         Returns:
             None
@@ -44,13 +40,11 @@ class Scraper:
         self.driver.execute_script("window.scrollTo(0, 500);")
     
     def browse_next(self) -> webdriver:
-        """
-        This function allows the user to move from page to page by clicking on the next page button
+        """This function allows the user to move from page to page by clicking on the next page button
 
         Returns:
            self.driver (webdriver): _description_The current webpage so the information is not lost
         """
-
         self.driver.execute_script("window.scrollTo(0 , document.body.scrollHeight);")
         WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.next_page_xpath)))
         next_page = self.driver.find_element(By.XPATH, Configuration_XPATH.next_page_xpath) 
@@ -58,13 +52,11 @@ class Scraper:
         return self.driver
 
     def search(self) -> None:
-        """
-        This function allows the user to search the webpage with a desired search term.
+        """This function allows the user to search the webpage with a desired search term.
 
         Returns:
             None
         """
-
         search_bar = self.driver.find_element(By.XPATH, Configuration_XPATH.search_xpath)
         search_bar.click()
         WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.search_input_xpath)))
@@ -83,8 +75,7 @@ class Scraper:
         print(f'Search for {search_input} has been entered')
     
     def load_and_accept_cookies(self, website: str) -> None:
-        """
-        This function will wait for the page to load and accept page cookies
+        """This function will wait for the page to load and accept page cookies
 
         Args:
             website (str): The homepage of the desired website to be scraped.
@@ -103,8 +94,7 @@ class Scraper:
             print("Loading took too much time!")
     
     def load_and_reject_promotion(self) -> None:
-        """
-        This function will load promotional pop-ups and close them
+        """This function will load promotional pop-ups and close them
 
         Returns:
             None
@@ -138,14 +128,11 @@ class Scraper:
                 continue 
     
     def ask_department(self) -> str:
-        """
-        This fucntion will ask the department which is desired to be scraped, i.e Men or Women
+        """This fucntion will ask the department which is desired to be scraped, i.e Men or Women
 
         Returns:
             department (str): The department which is to be scraped
-    
         """
-
         while True:
             department = str(input("Enter either the Men or Women's department to scrape: ")).lower().capitalize()
             if department == 'Men' or department == 'Women':
@@ -155,8 +142,7 @@ class Scraper:
                 print("Please enter either the Men or Women department")
 
     def get_categories(self, department:str) -> list:
-        """
-        This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
+        """This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
 
         Args:
             department (str): The departemnt which is to be scraped, i.e Men, Women or Kids
@@ -164,7 +150,6 @@ class Scraper:
         Returns:
             category_dict_list (list): A list which each element contains a dictionary with the main categories
             per department and the links to the category
-
         """
         WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))))
         department_button = self.driver.find_element(By.XPATH, Configuration_XPATH.DEPARTMENT_XPATH.format(department))
@@ -205,8 +190,7 @@ class Scraper:
         return category_dict_list
  
     def get_subcategories_links(self, category_dict_list: list) -> list:
-        """
-        This function will create a list of all the items to be scraped by creating a list of dicts
+        """This function will create a list of all the items to be scraped by creating a list of dicts
 
         This function takes the input of the categories dict list, visits each category individually and generates dict containing each 
         the relevant department, category, category link, sub-category and the sub-category link. The function will then return this list 
@@ -243,8 +227,7 @@ class Scraper:
         return full_scrape_list 
 
     def get_links(self, subcategory:str, department:str) -> list:
-        """
-        This function visits a sub-category and gets a list of all the links to all the items in the subcategory
+        """This function visits a sub-category and gets a list of all the links to all the items in the subcategory
 
         Args:
             subcategory (str): The current subcategory to be scraped

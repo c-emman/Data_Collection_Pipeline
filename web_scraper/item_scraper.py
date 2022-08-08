@@ -23,8 +23,11 @@ class Item_Scraper(Scraper):
         self.department = str()
         self.category = str()
         self.subcategory = str()
+        # Sets the S3 client connection and credentials
         self.s3_client = boto3.client('s3', region_name=S3_Config.REGION, aws_access_key_id=S3_Config.ACCESS_KEY, aws_secret_access_key=S3_Config.SECRET_KEY)
         self.bucketname = 'chris-aircore-s3bucket'
+        # Sets the optional arguments to pass to the scraper to scrape a specific category, whether to save locally or on the cloud and the maximum number 
+        # of items to scrape
         self.parser = argparse.ArgumentParser(description='Item Scraper class which will scrape products from website.')
         self.parser.add_argument( "-m", "--men", help='Scrape only the Mens department.', default=False, action='store_true')
         self.parser.add_argument("-w", "--women", help='Scrape only the Womens department.', default=False, action='store_true')
@@ -35,8 +38,10 @@ class Item_Scraper(Scraper):
         self.args = self.parser.parse_args()
         self.list_max = int(self.args.number)
         self.flag = False
+        # If locally isn't selected sets the connection to the AWS RDS PostgreSQL Database
         if self.args.locally is False:
             self.engine = sqlalchemy.create_engine(f'{Db_Config.DATABASE_TYPE}+{Db_Config.DBAPI}://{Db_Config.USER}:{Db_Config.PASSWORD}@{Db_Config.ENDPOINT}:{Db_Config.PORT}/{Db_Config.DATABASE}')
+        # Sets the list of items to scrape on the cloud
         self.products_scraped_cloud = list()
         self.dep_list = Configuration_XPATH.DEP_LIST
         if self.args.men is True:
@@ -69,10 +74,11 @@ class Item_Scraper(Scraper):
         """
         self.load_and_accept_cookies(Configuration_XPATH.WEBSITE)
         self.load_and_reject_promotion()    
-        
+        # Iterates through the list of departments to scrape
         for i in range(len(self.dep_list)):
             department = self.dep_list[i]
             self.department = department
+            # If locally is False will connect to the RDS Database and create a schema for the department
             if self.args.locally is False:
                 self.engine.execute(f'''CREATE SCHEMA IF NOT EXISTS {self.department}_data''')
                 print(f'The {self.department}_data schema has been made')
@@ -91,6 +97,7 @@ class Item_Scraper(Scraper):
         Return:
             None
         """
+        # Will iterate through the full_scrape_list to scrape the data
         for full_scrape_dict in full_scrape_list:
             subcategory_link = full_scrape_dict["subcategory_link"]
             self.category = full_scrape_dict["category"]
@@ -98,6 +105,7 @@ class Item_Scraper(Scraper):
             self.driver.get(subcategory_link)
             self.link_list = self.get_links(self.subcategory, self.department)
             self.max_items = min(self.list_max, len(self.link_list))
+            # Will create a table in the RDS Database if it doesn't exist
             if self.args.locally is False:
                 self.engine.execute(f'''CREATE TABLE IF NOT EXISTS {self.department}_data.{self.subcategory} (
                                             uuid VARCHAR(36) PRIMARY KEY,
@@ -110,6 +118,7 @@ class Item_Scraper(Scraper):
                                             image_links VARCHAR(1000)
                                             );''')
                 print(f'The {self.subcategory} table in the {self.department}_data schema has been made.')
+                # Gets the products already in the Databse and creates a list of the products already scraped
                 result = self.engine.execute(f'''SELECT product_no FROM {self.department}_data.{self.subcategory}''')
                 for product_no in result:
                     self.products_scraped_cloud.append(str(product_no).replace("(", "").replace(")", "").replace(",", "").replace("'", ""))
@@ -124,6 +133,7 @@ class Item_Scraper(Scraper):
             None
         """
         for link in self.link_list[:self.max_items]:
+            # Checks whether the product to be scraped has already been added to the Database, if so then will move onto the next product
             if self.args.locally is False:
                 if link["product_no"] in self.products_scraped_cloud:
                     print(f'Product information for item {link["product_no"]} has already been scraped')
@@ -144,14 +154,17 @@ class Item_Scraper(Scraper):
             images_link_list = images_tuple[1]
             product_dict["image_links"] = images_list
             if self.args.locally is False:
+                # If no optional argument for storage selected will default save both locally and on cloud
                 if self.args.cloud is False:
                     self.create_json(product_dict, item_path)
                     print(f'...Saving .json file locally for product: {product_dict["product_no"]}...')
                     self.upload_data_s3(f'{item_path}/data.json', self.bucketname, f'{product_dict["product_no"]}.json')
                     print(f'...Uploading .json file for product: {product_dict["product_no"]} to S3...')
+                # If cloud argument is seleced will upload data directly to AWS
                 if self.args.cloud is True:
                     self.s3_client.put_object(Body=json.dumps(product_dict), Bucket=self.bucketname, Key=f'{product_dict["product_no"]}.json')
                     print(f'...Uploading .json file for product {product_dict["product_no"]} directly to S3...')
+                # Will upload the data to RDS databse
                 table_insert = self.clean_product_data(product_dict, images_link_list)
                 self.engine.execute(sqlalchemy.text(f'''INSERT INTO {self.department}_data.{self.subcategory}(uuid, product_no, brand, product_info, price, size_and_fit, brand_bio, image_links) VALUES{table_insert}'''))
                 print(f'...Inserting the data into the PostgreSQL AWS RDS database in the {self.department}_data.{self.subcategory} table for product: {product_dict["product_no"]}...')   
@@ -169,12 +182,15 @@ class Item_Scraper(Scraper):
         """
         product_dict = dict()
         a = 0
+        # Will run loop on data 3 times to check whether page has loaded
         while True:
+            # If not able to scrape after loops will move onto next record
             if a == 3:
                 print(f'Item page did not load. Unable to scrape item data for item in {self.department} {self.subcategory} department.')
                 self.flag =  True
                 return product_dict
             try:
+                # Creates a dict of the relevant item data to be scraped
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.product_no_xpath)))
                 product_dict["uuid"] = self.get_uuid()     
                 product_dict["brand"] = self.get_brand()
@@ -229,9 +245,11 @@ class Item_Scraper(Scraper):
         Returns:
             size_and_fit (str): A description of the size and fit of a product 
         """
+        # First checks whether the size & fit category has been selected, if so will save the data. 
         if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "size & fit":
             size_and_fit = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text    
         else:
+            # If has not been selected will click on the size & fit and scrape the data. If there is no size & fit will set to None
             try:
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)))
                 size_and_fit_button = self.driver.find_element(By.XPATH, Configuration_XPATH.SIZE_AND_FIT_INACTIVE_XPATH)
@@ -247,9 +265,11 @@ class Item_Scraper(Scraper):
         Returns:
             brand_bio (str): A str of the brand bio of a product
         """
+        # First checks whether the brand bio category has been selected, if so will save the data. 
         if self.driver.find_element(By.XPATH, Configuration_XPATH.HEADING_INFO_ACTIVE_XPATH).text.lower() == "brand bio":
             brand_bio = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text   
         else:
+            # If has not been selected will click on the brand bio and scrape the data. If there is no brand bio will set to None
             try:
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)))
                 brand_bio_button =  self.driver.find_element(By.XPATH, Configuration_XPATH.BRAND_BIO_INACTIVE_XPATH)
@@ -302,20 +322,24 @@ class Item_Scraper(Scraper):
             images_list (list): A list of dicts for the image links for a specific item and the corresponding image name.
             images_link_list (list): A list of links to the images.
         """
+        # Obtains list of xpaths to images
         images_list = []
         images_link_list = []
         images_xpath = self.driver.find_elements(By.XPATH, Configuration_XPATH.images_xpath)
 
-        a = 1
-        b = 0
-        c = 0
+        a = 1 # Counter for pictures used for naming the picture
+        b = 0 # Counter for how many pictures were uploaded to S3
+        c = 0 # Counter for how many pictures were saved  locally
+        # Iterates through the list of images xpaths
         for image in images_xpath:
+            # Creates the images dict with the image name and the link to the corresponding image
             image_dict = dict()
             img_name = path_img + str(f'/{product_dict["product_no"]}_{a}')
             image_dict["image_no"] = str(f'{product_dict["product_no"]}_{a}')
             image_dict["link"] = image.get_attribute('src')
             images_link_list.append(image.get_attribute('src'))
             images_list.append(image_dict)
+            # If not specified to cloud then will download images and upload to S3 if product no in list of items already scraped.
             if self.args.cloud is False:
                 if os.path.exists(img_name) == False:
                     self.download_images(image_dict["link"], img_name)
@@ -328,6 +352,7 @@ class Item_Scraper(Scraper):
                 else:
                     self.upload_data_s3(f'{img_name}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
                     b += 1
+            # If cloud is specified then will create a temporary directory download image, upload to S3 then close the temporary directory
             else:
                 with tempfile.TemporaryDirectory() as tempdir:
                     self.download_images(image_dict["link"], f'{tempdir}/{product_dict["product_no"]}_{str(a)}')
