@@ -434,7 +434,7 @@ class Item_Scraper(Scraper):
                 size_and_fit_button.click()
                 size_and_fit = self.driver.find_element(By.XPATH, Configuration_XPATH.size_and_fit_xpath).text
             except:
-                size_and_fit = None
+                size_and_fit = ''
         return size_and_fit
 
     def get_brand_bio(self) -> str:
@@ -454,5 +454,5 @@ class Item_Scraper(Scraper):
                 brand_bio_button.click()
                 brand_bio = self.driver.find_element(By.XPATH, Configuration_XPATH.brand_bio_xpath).text
             except:
-                brand_bio = None
+                brand_bio = ''
         return brand_bio
