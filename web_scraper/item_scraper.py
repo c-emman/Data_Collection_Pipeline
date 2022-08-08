@@ -191,7 +191,7 @@ class Item_Scraper(Scraper):
         """Function to generate a unique user id number
 
         Returns:
-            _product_uuid (str): The unique user id
+            product_uuid (str): The unique user id
         """
         product_uuid = str(uuid.uuid4())
         return product_uuid
