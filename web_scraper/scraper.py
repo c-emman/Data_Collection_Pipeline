@@ -21,6 +21,7 @@ class Scraper:
     def __init__(self, website: str) -> None:
         """See help(Scraper) for more information
         """
+        # The necessary Chrome options to pass to the webdriver. This will configure the webdriver.
         options = webdriver.ChromeOptions()
         options.add_argument(Driver_Configuration.DISABLE_DEV_SHM)
         options.add_argument(Driver_Configuration.NO_SANDBOX)
@@ -102,12 +103,15 @@ class Scraper:
         time.sleep(2)
         a=0
         while True:
+            # Function will run loop 10 times checking whether the promotion box is up
             if a == 10:
                 print("No promotion pop-up this time!")
                 break
             try:
+                # Will check if a promotion box is up using webdriverwait
                 WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.promotion_box)))
                 try:
+                    # Checks for promotion 1, if present will close 
                     WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.wait_for_promotion4_xpath)))
                     reject_promotion_button = self.driver.find_element(By.XPATH, Configuration_XPATH.reject_promotion4_xpath)
                     reject_promotion_button.click()
@@ -115,13 +119,13 @@ class Scraper:
                     break
                 except:
                     try:
+                        # Will check for promotion 2 if promotion 1 is not present
                         WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.wait_for_promotion3_xpath)))
                         reject_promotion_button = self.driver.find_element(By.XPATH, Configuration_XPATH.reject_promotion3_xpath)
                         reject_promotion_button.click()
                         print("Promotion has been closed!")
                         break
                     except TimeoutException:
-                        #print("No promotion pop-up this time!")  
                         a+=1         
             except:
                 a+=1
@@ -157,18 +161,22 @@ class Scraper:
         print(f'Scraper has clicked on the {department} department.')
         time.sleep(5)
 
+        # Function will check if there is a second button to press depending on the department which is clicked
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH))>0:
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_all_elements_located((By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)))
             shop_department_button = self.driver.find_elements(By.XPATH, Configuration_XPATH.DEPARTMENT_BUTTON_XPATH)
             try:
+                # If kids department is clicked will locate the unisex department button.
                 shop_department_button[3].click()
                 print(f'The {department} department button has been clicked.')
                 time.sleep(2)
             except: 
+                # Otherwise will click on the department button.
                 shop_department_button[0].click()
                 print(f'The {department} department button has been clicked.')
                 time.sleep(2)
             
+        # Will check if the category department dropdown is open, if not will click it to open it.
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.choose_categories_dropdown_xpath)) >0:
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.choose_category_button)))
             category_dropdown = self.driver.find_element(By.XPATH, Configuration_XPATH.choose_category_button)
@@ -176,10 +184,11 @@ class Scraper:
             print('Category dropdown menu clicked')
         else:
             pass
-
+        # Will set the categories links to a list
         choose_categories = self.driver.find_elements(By.XPATH, Configuration_XPATH.CHOOSE_CATEGORIES_XPATH)
         category_dict_list = []
 
+        # Iterates through the list of category xpaths and obtains a list of dicts with the category name and link
         for element in choose_categories:
             category_dict = dict()
             category_dict["department"] = department
@@ -206,6 +215,7 @@ class Scraper:
         full_scrape_list = []
         a=0
         while True:
+            # Function will iterate 3 times through the categories, visit each category link and obtain xpath list of categories
             if a == 3:
                 break
             category_dict = category_dict_list[a]
@@ -213,7 +223,7 @@ class Scraper:
             time.sleep(2)
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.CHOOSE_CATEGORIES_XPATH)))
             choose_subcategories = self.driver.find_elements(By.XPATH, Configuration_XPATH.CHOOSE_SUBCATEGORIES_XPATH)
-            
+            # Will iterate through the xpath list of categories and create a dict with subcategory name, link and category link, name and department
             for element in choose_subcategories:
                 full_scrape_dict = dict()
                 full_scrape_dict["department"] = category_dict["department"]
@@ -238,6 +248,7 @@ class Scraper:
         """
         link_list = []
         time.sleep(2)
+        # Checks whether the page length is 1 or more, if more than one will obtain the total number of pages, if 1 then will set the pagination_no to 0
         if len(self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)) > 0:
             pagination_xpaths = self.driver.find_elements(By.XPATH, Configuration_XPATH.pagination_xpath)
             pagination = pagination_xpaths[-2].get_attribute('href')
@@ -246,6 +257,7 @@ class Scraper:
         else:
             pagination_no = 0
         a =0
+        # If the pagination_no is 0 then will only get the links to the items on the page
         if a == pagination_no:
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
             item_container = self.driver.find_element(By.XPATH, Configuration_XPATH.item_container_xpath)
@@ -258,6 +270,7 @@ class Scraper:
                 link_dict["product_no"] = a_tag.get_attribute('data-secondid')
                 link_list.append(link_dict)
             return link_list
+        # If the pagination_no is greater than zero will iterate through the pages and obtain the links on each page.
         else:
             while True:
                 WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.XPATH, Configuration_XPATH.item_container_xpath)))
@@ -272,7 +285,7 @@ class Scraper:
                     link_list.append(link_dict)
                 
                 a+= 1
-                
+                # Once reached the final page will stop iterating 
                 if a == (pagination_no):
                     print(f"Links on the {department} {subcategory} department pages have been scraped")
                     return link_list
