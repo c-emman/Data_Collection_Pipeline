@@ -44,5 +44,5 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/web_scraper:latest
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/web_scraper:v14
 
