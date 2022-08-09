@@ -278,7 +278,8 @@ class Item_Scraper(Scraper):
                     c += 1
                 else:
                     print('Image has already been saved locally')
-
+                if self.args.locally is True:
+                    continue
                 if_scraped = self.check_on_s3_images(product_dict, image_dict)
                 if if_scraped == True:
                     continue
@@ -316,7 +317,7 @@ class Item_Scraper(Scraper):
 
         Args:
             product_dict (dict): Dictionary of the product details which have been scraped
-            image_dict (dict): 
+            image_dict (dict): Dictionary of image name and links for a product
 
         Returns:
             bool
@@ -350,13 +351,21 @@ class Item_Scraper(Scraper):
         """Will update the list of the keys of objects in S3
 
         Args:
-            product_dict (dict): _description_
+            product_dict (dict): Dictionary of the data for a specfic item
         """
         objects = self.s3_bucket.objects.filter(Prefix=f'{product_dict["product_no"]}')
         for object in objects:
             self.images_scraped_cloud.append(object.key)
 
-    def item_scrape_mkdirs(self, product_dict: dict):
+    def item_scrape_mkdirs(self, product_dict: dict) -> tuple[str, str]:
+        """Function which creates all the required PATHs and directories.
+
+        Args:
+            product_dict (dict): Dictionary of the data for a specfic item
+
+        Returns:
+            path_img, item_path ( tuple[str, str] ): The PATH for the image to be downloaded and the item.
+        """
         path = Configuration_XPATH.RAW_DATA_PATH + f'/{self.department}/{self.category}/{self.subcategory}'
         self.create_dir(path)
         item_path = path + f'/{product_dict["product_no"]}'
