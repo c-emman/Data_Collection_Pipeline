@@ -88,7 +88,7 @@ class Scraper:
                 a+=1
                 continue 
     
-    def get_categories(self, department:str) -> list:
+    def get_categories(self, department:str) -> list[dict]:
         """This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
 
         Args:
@@ -124,7 +124,7 @@ class Scraper:
             category_dict_list.append(category_dict)
         return category_dict_list
 
-    def get_subcategories_links(self, category_dict_list: list) -> list:
+    def get_subcategories_links(self, category_dict_list: list) -> list[dict]:
         """This function will create a list of all the items to be scraped by creating a list of dicts
 
         This function takes the input of the categories dict list, visits each category individually and generates dict containing each 
@@ -162,7 +162,7 @@ class Scraper:
             a+=1
         return full_scrape_list 
 
-    def get_links(self, subcategory:str, department:str) -> list:
+    def get_links(self, subcategory:str, department:str) -> list[dict]:
         """This function visits a sub-category and gets a list of all the links to all the items in the subcategory
 
         Args:
