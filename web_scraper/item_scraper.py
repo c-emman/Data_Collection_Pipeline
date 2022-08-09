@@ -142,29 +142,33 @@ class Item_Scraper(Scraper):
                     print(f'Product information for item {link["product_no"]} has already been scraped')
                     continue
             self.driver.get(link["link"])
-            path = Configuration_XPATH.RAW_DATA_PATH + f'/{self.department}/{self.category}/{self.subcategory}'
-            self.create_dir(path)
             product_dict = self.scrape_item_data()
             product_dict["product_no"] = link["product_no"]
             if self.flag == True:
                 continue
-            item_path = path + f'/{product_dict["product_no"]}'
-            self.create_dir(item_path)
-            path_img = item_path + '/images'
-            self.create_dir(path_img)
+            path_tuple = self.item_scrape_mkdirs(product_dict)
+            path_img = path_tuple[0]
+            item_path = path_tuple[1]
             images_tuple = self.get_images(path_img, product_dict)
             images_list = images_tuple[0]
             images_link_list = images_tuple[1]
             product_dict["image_links"] = images_list
             if self.args.locally is False:
+                if_scraped = self.check_on_s3_json(product_dict)
                 # If no optional argument for storage selected will default save both locally and on cloud
                 if self.args.cloud is False:
                     self.create_json(product_dict, item_path)
                     print(f'...Saving .json file locally for product: {product_dict["product_no"]}...')
+                    if if_scraped == True:
+                        print(f'Product: {product_dict["product_no"]} .json file has already been uploaded to S3')
+                        continue
                     self.upload_data_s3(f'{item_path}/data.json', self.bucketname, f'{product_dict["product_no"]}.json')
                     print(f'...Uploading .json file for product: {product_dict["product_no"]} to S3...')
                 # If cloud argument is seleced will upload data directly to AWS
                 if self.args.cloud is True:
+                    if if_scraped == True:
+                        print(f'Product: {product_dict["product_no"]} .json file has already been uploaded to S3')
+                        continue
                     self.s3_client.put_object(Body=json.dumps(product_dict), Bucket=self.bucketname, Key=f'{product_dict["product_no"]}.json')
                     print(f'...Uploading .json file for product {product_dict["product_no"]} directly to S3...')
                 # Will upload the data to RDS databse
@@ -275,14 +279,14 @@ class Item_Scraper(Scraper):
                 else:
                     print('Image has already been saved locally')
 
-                if_scraped = self.check_on_s3(product_dict, image_dict)
+                if_scraped = self.check_on_s3_images(product_dict, image_dict)
                 if if_scraped == True:
                     continue
                 self.upload_data_s3(f'{img_name}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
                 b += 1
             # If cloud is specified then will create a temporary directory download image, upload to S3 then close the temporary directory
             else:
-                if_scraped = self.check_on_s3(product_dict, image_dict)
+                if_scraped = self.check_on_s3_images(product_dict, image_dict)
                 if if_scraped == True:
                     continue
                 self.cloud_image_download(product_dict, image_dict, a)
@@ -307,27 +311,59 @@ class Item_Scraper(Scraper):
             tempdir_img = f'{tempdir}/{product_dict["product_no"]}_{str(a)}'
             self.upload_data_s3(f'{tempdir_img}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
     
-    def check_on_s3(self, product_dict: dict, image_dict: dict) -> bool:
+    def check_on_s3_images(self, product_dict: dict, image_dict: dict) -> bool:
         """Will visit S3 and check whether the image has been put on S3
 
         Args:
             product_dict (dict): Dictionary of the product details which have been scraped
-        """
-        # obj = self.s3_client.list_objects(Bucket=self.bucketname, Prefix=f'{product_dict["product_no"]}', MaxKeys=10)
-        # for key in response['Contents']:
-        #     self.images_scraped_cloud.append(key['Key'])
-        objects = self.s3_bucket.objects.filter(Prefix=f'{product_dict["product_no"]}')
-        for object in objects:
-            self.images_scraped_cloud.append(object.key)
-        
-        print(self.images_scraped_cloud)
+            image_dict (dict): 
 
-        if image_dict["image_no"] in self.images_scraped_cloud:
-            print('Product image has already been uploaded to S3')
+        Returns:
+            bool
+        """
+        self.update_s3_key_list(product_dict)
+
+        if f'{image_dict["image_no"]}.jpg' in self.images_scraped_cloud:
+            print(f'Product: {image_dict["image_no"]} image has already been uploaded to S3')
             return True
         else:
             return False
 
+    def check_on_s3_json(self, product_dict: dict) -> bool:
+        """Will visit S3 and check whether the .json has been put on S3
+
+        Args:
+            product_dict (dict): Dictionary of the product details which have been scraped
+
+        Returns:
+            bool
+        """
+        self.update_s3_key_list(product_dict)
+
+        if f'{product_dict["product_no"]}.json' in self.images_scraped_cloud:
+            print(f'Product: {product_dict["product_no"]} .json file has already been uploaded to S3')
+            return True
+        else:
+            return False
+    
+    def update_s3_key_list(self, product_dict: dict):
+        """Will update the list of the keys of objects in S3
+
+        Args:
+            product_dict (dict): _description_
+        """
+        objects = self.s3_bucket.objects.filter(Prefix=f'{product_dict["product_no"]}')
+        for object in objects:
+            self.images_scraped_cloud.append(object.key)
+
+    def item_scrape_mkdirs(self, product_dict: dict):
+        path = Configuration_XPATH.RAW_DATA_PATH + f'/{self.department}/{self.category}/{self.subcategory}'
+        self.create_dir(path)
+        item_path = path + f'/{product_dict["product_no"]}'
+        self.create_dir(item_path)
+        path_img = item_path + '/images'
+        self.create_dir(path_img)
+        return path_img, item_path
 
     def create_dir(self, PATH: str) -> None:
         """This function will create a directory which does not exist
