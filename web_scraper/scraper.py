@@ -272,6 +272,7 @@ class Scraper:
             regex_list = regex.split('/', pagination)
             pagination_no = int(regex_list[-2][5:]) 
         else:
+            pagination = ''
             pagination_no = 0    
         return pagination_no, pagination
 
