@@ -4,6 +4,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from web_scraper.config import AnyEc, Configuration_XPATH, Db_Config, S3_Config
 from web_scraper.scraper import Scraper
+from typing import Dict, Tuple, List
 import tempfile
 import argparse
 import sqlalchemy
@@ -180,7 +181,7 @@ class Item_Scraper(Scraper):
                 print(f'...Saving .json file locally for product: {product_dict["product_no"]}...')    
         print(f"All the {self.subcategory} data in the {self.department}'s department has been scraped.")
         
-    def scrape_item_data(self) -> dict:
+    def scrape_item_data(self) -> Dict:
         """
         This function scrapes the data for an individual item into a dict
 
@@ -210,7 +211,7 @@ class Item_Scraper(Scraper):
             except TimeoutException:
                 a+=1
 
-    def clean_product_data(self, product_dict: dict, images_link_list: list) -> str:
+    def clean_product_data(self, product_dict: Dict, images_link_list: List) -> str:
         """A function which cleans the data from the product_dict to allow it to be uploaded to AWS RDS PostgreSQL
 
         Args:
@@ -242,7 +243,7 @@ class Item_Scraper(Scraper):
         table_insert = f'({value_1}, {value_2}, {value_3}, {value_4}, {value_5}, {value_6}, {value_7}, {value_8})'
         return table_insert
     
-    def get_images(self, path_img: str, product_dict: dict) -> tuple[ list[dict], list]:
+    def get_images(self, path_img: str, product_dict: Dict) -> Tuple[ List[Dict], List]:
         """The function will get all the images for an item and call a function to download the image
 
         Args:
@@ -299,20 +300,23 @@ class Item_Scraper(Scraper):
             print(f'{c} images for product: {product_dict["product_no"]} have been saved locally')
         return images_list, images_link_list
 
-    def cloud_image_download(self, product_dict: dict, image_dict: dict, a:int):
+    def cloud_image_download(self, product_dict: Dict, image_dict: Dict, a:int) -> None:
         """Will directly download an image to AWS S3 and not save permanently to locall device
 
         Args:
             product_dict (dict): Dictionary of the product details which have been scraped
             image_dict (dict): Dictionary of image name and links for a product
             a (int): The image number of a specific image
+        
+        Returns:
+            None
         """
         with tempfile.TemporaryDirectory() as tempdir:
             self.download_images(image_dict["link"], f'{tempdir}/{product_dict["product_no"]}_{str(a)}')
             tempdir_img = f'{tempdir}/{product_dict["product_no"]}_{str(a)}'
             self.upload_data_s3(f'{tempdir_img}.jpg', self.bucketname, f'{image_dict["image_no"]}.jpg')
     
-    def check_on_s3_images(self, product_dict: dict, image_dict: dict) -> bool:
+    def check_on_s3_images(self, product_dict: Dict, image_dict: Dict) -> bool:
         """Will visit S3 and check whether the image has been put on S3
 
         Args:
@@ -330,7 +334,7 @@ class Item_Scraper(Scraper):
         else:
             return False
 
-    def check_on_s3_json(self, product_dict: dict) -> bool:
+    def check_on_s3_json(self, product_dict: Dict) -> bool:
         """Will visit S3 and check whether the .json has been put on S3
 
         Args:
@@ -347,7 +351,7 @@ class Item_Scraper(Scraper):
         else:
             return False
     
-    def update_s3_key_list(self, product_dict: dict):
+    def update_s3_key_list(self, product_dict: Dict) -> None:
         """Will update the list of the keys of objects in S3
 
         Args:
@@ -357,7 +361,7 @@ class Item_Scraper(Scraper):
         for object in objects:
             self.images_scraped_cloud.append(object.key)
 
-    def item_scrape_mkdirs(self, product_dict: dict) -> tuple[str, str]:
+    def item_scrape_mkdirs(self, product_dict: Dict) -> Tuple[str, str]:
         """Function which creates all the required PATHs and directories.
 
         Args:
@@ -387,7 +391,7 @@ class Item_Scraper(Scraper):
             if os.path.exists(PATH) == False:
                 os.makedirs(PATH)
 
-    def create_json(self, product_dict: dict, item_path: str) -> None:
+    def create_json(self, product_dict: Dict, item_path: str) -> None:
         """The function will create a JSON file for a dictionary in a desired PATH
 
         Args:
