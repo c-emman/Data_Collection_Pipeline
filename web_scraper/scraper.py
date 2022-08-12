@@ -6,6 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from web_scraper.config import Configuration_XPATH, Driver_Configuration
+from typing import List, Dict, Tuple
 import time
 import regex
 
@@ -88,7 +89,7 @@ class Scraper:
                 a+=1
                 continue 
     
-    def get_categories(self, department:str) -> list[dict]:
+    def get_categories(self, department:str) -> List[Dict]:
         """This function will take the department and generate of the relevant categories with corresponding links which need to be scraped.
 
         Args:
@@ -124,7 +125,7 @@ class Scraper:
             category_dict_list.append(category_dict)
         return category_dict_list
 
-    def get_subcategories_links(self, category_dict_list: list) -> list[dict]:
+    def get_subcategories_links(self, category_dict_list: List) -> List[Dict]:
         """This function will create a list of all the items to be scraped by creating a list of dicts
 
         This function takes the input of the categories dict list, visits each category individually and generates dict containing each 
@@ -162,7 +163,7 @@ class Scraper:
             a+=1
         return full_scrape_list 
 
-    def get_links(self, subcategory:str, department:str) -> list[dict]:
+    def get_links(self, subcategory:str, department:str) -> List[Dict]:
         """This function visits a sub-category and gets a list of all the links to all the items in the subcategory
 
         Args:
@@ -202,7 +203,7 @@ class Scraper:
                 paginagion_link = str(pagination[:index+1]) + f'{a+1}/'    
                 self.driver.get(paginagion_link)
 
-    def locate_department_page(self, department:str):
+    def locate_department_page(self, department:str) -> None:
         """Will navigate to the correct department page if not currently on that page.
 
         Args:
@@ -227,7 +228,7 @@ class Scraper:
         else:
             pass
         
-    def category_dropdown(self):
+    def category_dropdown(self) -> None:
         """Will click the category dropdown button to display categories if categories are not currently being shown.
 
         Returns:
@@ -241,7 +242,7 @@ class Scraper:
         else:
             pass
     
-    def get_page_links(self) -> list[dict]:
+    def get_page_links(self) -> List[Dict]:
         """Function to get the links on a single page and form into a list.
 
         Returns:
@@ -259,7 +260,7 @@ class Scraper:
             page_link_list.append(link_dict)
         return page_link_list
     
-    def get_pagination(self) -> tuple[int, str]:
+    def get_pagination(self) -> Tuple[int, str]:
         """Will obtain the number of pages to iterate through and the base URL which can be concatenated.
 
         Returns:
